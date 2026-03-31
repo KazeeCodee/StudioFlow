@@ -186,6 +186,82 @@ export async function listAdminBookings() {
     .orderBy(desc(bookings.startsAt));
 }
 
+export async function listCalendarEntries({
+  memberId,
+  spaceId,
+  status,
+}: {
+  memberId?: string;
+  spaceId?: string;
+  status?: string;
+} = {}) {
+  const db = getDb();
+  const bookingConditions = [
+    memberId ? eq(bookings.memberId, memberId) : undefined,
+    spaceId ? eq(bookings.spaceId, spaceId) : undefined,
+    status ? eq(bookings.status, status as "pending") : undefined,
+  ].filter(Boolean);
+
+  const blockConditions = [spaceId ? eq(spaceBlocks.spaceId, spaceId) : undefined].filter(Boolean);
+
+  const [bookingItems, blockItems] = await Promise.all([
+    db
+      .select({
+        id: bookings.id,
+        title: spaces.name,
+        start: bookings.startsAt,
+        end: bookings.endsAt,
+        status: bookings.status,
+        memberName: members.fullName,
+        resourceLabel: spaces.name,
+      })
+      .from(bookings)
+      .innerJoin(members, eq(members.id, bookings.memberId))
+      .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
+      .where(bookingConditions.length > 0 ? and(...bookingConditions) : undefined)
+      .orderBy(bookings.startsAt),
+    db
+      .select({
+        id: spaceBlocks.id,
+        title: spaceBlocks.title,
+        start: spaceBlocks.startsAt,
+        end: spaceBlocks.endsAt,
+        reason: spaceBlocks.reason,
+        resourceLabel: spaces.name,
+      })
+      .from(spaceBlocks)
+      .innerJoin(spaces, eq(spaces.id, spaceBlocks.spaceId))
+      .where(blockConditions.length > 0 ? and(...blockConditions) : undefined)
+      .orderBy(spaceBlocks.startsAt),
+  ]);
+
+  return [
+    ...bookingItems.map((item) => ({
+      id: item.id,
+      title: item.title,
+      start: item.start.toISOString(),
+      end: item.end.toISOString(),
+      extendedProps: {
+        type: "booking" as const,
+        status: item.status,
+        resourceLabel: item.resourceLabel,
+        secondaryLabel: item.memberName,
+      },
+    })),
+    ...blockItems.map((item) => ({
+      id: item.id,
+      title: item.title,
+      start: item.start.toISOString(),
+      end: item.end.toISOString(),
+      extendedProps: {
+        type: "block" as const,
+        resourceLabel: item.resourceLabel,
+        secondaryLabel: item.reason ?? "Bloqueo operativo",
+      },
+    })),
+  ].sort((a, b) => a.start.localeCompare(b.start));
+}
+
 export async function listMemberBookings(profileId: string) {
   const member = await getMemberByProfileId(profileId);
 
