@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { CalendarDays, CreditCard, LayoutDashboard, Settings, Users } from "lucide-react";
+import {
+  CalendarDays,
+  CreditCard,
+  LayoutDashboard,
+  Settings,
+  Ticket,
+  Users,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/modules/auth/types";
@@ -18,6 +25,7 @@ type SidebarNavProps = {
 const adminItems: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/members", label: "Miembros", icon: Users, hint: "Activos" },
+  { href: "/admin/plans", label: "Planes", icon: Ticket },
   { href: "/admin/calendar", label: "Agenda", icon: CalendarDays },
   { href: "/admin/renewals", label: "Renovaciones", icon: CreditCard },
   { href: "/admin/settings", label: "Configuración", icon: Settings },
