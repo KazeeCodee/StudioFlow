@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { hasOverlap } from "@/services/bookings/check-availability";
+import {
+  applyBookingBuffer,
+  hasOverlap,
+} from "@/services/bookings/check-availability";
 
 describe("hasOverlap", () => {
   it("detecta solapamientos del mismo espacio", () => {
@@ -15,6 +18,25 @@ describe("hasOverlap", () => {
         },
       ],
     );
+
+    expect(result).toBe(true);
+  });
+
+  it("considera el buffer operativo entre reservas", () => {
+    const bufferedTarget = applyBookingBuffer(
+      {
+        startsAt: new Date("2026-04-01T11:00:00Z"),
+        endsAt: new Date("2026-04-01T12:00:00Z"),
+      },
+      1,
+    );
+
+    const result = hasOverlap(bufferedTarget, [
+      {
+        startsAt: new Date("2026-04-01T10:00:00Z"),
+        endsAt: new Date("2026-04-01T11:00:00Z"),
+      },
+    ]);
 
     expect(result).toBe(true);
   });

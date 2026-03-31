@@ -10,8 +10,12 @@ import {
   getOverlappingSpaceBlocks,
   getSpaceBookingContext,
 } from "@/modules/bookings/queries";
+import { getOperationalSettings } from "@/modules/settings/queries";
 import { calculateBookingQuota } from "@/services/bookings/calculate-booking-quota";
-import { hasOverlap } from "@/services/bookings/check-availability";
+import {
+  applyBookingBuffer,
+  hasOverlap,
+} from "@/services/bookings/check-availability";
 
 function parseLocalDateTime(value: string) {
   const [datePart, timePart] = value.split("T");
@@ -121,9 +125,10 @@ export async function createBooking(
     input.startsAt,
     input.endsAt,
   );
-  const [memberPlan, space] = await Promise.all([
+  const [memberPlan, space, settings] = await Promise.all([
     getActiveMemberPlan(targetMemberId),
     getSpaceBookingContext(input.spaceId),
+    getOperationalSettings(),
   ]);
 
   if (!memberPlan) {
@@ -152,16 +157,25 @@ export async function createBooking(
     availabilityRules: space.availabilityRules,
   });
 
+  const bufferedInterval = applyBookingBuffer(
+    { startsAt, endsAt },
+    settings.bookingBufferHours,
+  );
+
   const [blockingBlocks, conflictingBookings] = await Promise.all([
     getOverlappingSpaceBlocks(space.id, startsAt, endsAt),
-    getOverlappingBookings(space.id, startsAt, endsAt),
+    getOverlappingBookings(
+      space.id,
+      bufferedInterval.startsAt,
+      bufferedInterval.endsAt,
+    ),
   ]);
 
   if (blockingBlocks.length > 0) {
     throw new Error("Existe un bloqueo operativo en ese horario.");
   }
 
-  if (hasOverlap({ startsAt, endsAt }, conflictingBookings)) {
+  if (hasOverlap(bufferedInterval, conflictingBookings)) {
     throw new Error("El espacio ya tiene una reserva superpuesta.");
   }
 
@@ -218,12 +232,13 @@ export async function createBooking(
       action: "booking.created",
       entityType: "booking",
       entityId: booking.id,
-      metadata: {
-        memberId: targetMemberId,
-        spaceId: space.id,
-        quotaConsumed,
-      },
-    });
+        metadata: {
+          memberId: targetMemberId,
+          spaceId: space.id,
+          quotaConsumed,
+          bookingBufferHours: settings.bookingBufferHours,
+        },
+      });
 
     return booking;
   });

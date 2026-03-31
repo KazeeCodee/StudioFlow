@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { canManageSettings } from "@/lib/permissions/guards";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/modules/auth/types";
 
@@ -47,7 +48,9 @@ function getItemsForRole(role: AppRole) {
 }
 
 export function SidebarNav({ role }: SidebarNavProps) {
-  const items = getItemsForRole(role);
+  const items = getItemsForRole(role).filter(
+    (item) => item.href !== "/admin/settings" || canManageSettings(role),
+  );
 
   return (
     <nav aria-label="Principal" className="space-y-2">
