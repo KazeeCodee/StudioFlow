@@ -6,6 +6,18 @@ import { requireAuthenticatedContext, requireMemberContext, requireStaffContext 
 import { bookingSchema, cancellationSchema } from "@/modules/bookings/schema";
 import { cancelBooking } from "@/services/bookings/cancel-booking";
 import { createBooking } from "@/services/bookings/create-booking";
+import {
+  sendBookingCancelledNotifications,
+  sendBookingCreatedNotifications,
+} from "@/services/notifications/dispatcher";
+
+async function notifySafely(task: () => Promise<void>) {
+  try {
+    await task();
+  } catch (error) {
+    console.error("Notification delivery failed", error);
+  }
+}
 
 export async function createAdminBookingAction(formData: FormData) {
   const { profile } = await requireStaffContext();
@@ -16,7 +28,8 @@ export async function createAdminBookingAction(formData: FormData) {
     endsAt: formData.get("endsAt"),
   });
 
-  await createBooking(input, profile);
+  const booking = await createBooking(input, profile);
+  await notifySafely(() => sendBookingCreatedNotifications(booking.id));
 
   revalidatePath("/admin/bookings");
   revalidatePath("/admin/bookings/new");
@@ -31,7 +44,8 @@ export async function createMemberBookingAction(formData: FormData) {
     endsAt: formData.get("endsAt"),
   });
 
-  await createBooking(input, profile);
+  const booking = await createBooking(input, profile);
+  await notifySafely(() => sendBookingCreatedNotifications(booking.id));
 
   revalidatePath("/member/bookings");
   revalidatePath("/member/bookings/new");
@@ -46,13 +60,14 @@ export async function cancelBookingAction(formData: FormData) {
     redirectTo: formData.get("redirectTo"),
   });
 
-  await cancelBooking(
+  const cancellation = await cancelBooking(
     {
       bookingId: input.bookingId,
       reason: input.reason,
     },
     profile,
   );
+  await notifySafely(() => sendBookingCancelledNotifications(cancellation.bookingId));
 
   const redirectTo = input.redirectTo || (profile.role === "member" ? "/member/bookings" : "/admin/bookings");
   revalidatePath(redirectTo);

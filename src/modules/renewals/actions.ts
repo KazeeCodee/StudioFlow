@@ -3,7 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaffContext } from "@/modules/auth/queries";
+import { sendRenewalConfirmationNotification } from "@/services/notifications/dispatcher";
 import { renewMemberPlan } from "@/services/renewals/renew-member-plan";
+
+async function notifySafely(task: () => Promise<void>) {
+  try {
+    await task();
+  } catch (error) {
+    console.error("Notification delivery failed", error);
+  }
+}
 
 export async function renewMemberPlanAction(formData: FormData) {
   const { profile } = await requireStaffContext();
@@ -15,13 +24,14 @@ export async function renewMemberPlanAction(formData: FormData) {
     throw new Error("Falta el plan a renovar.");
   }
 
-  await renewMemberPlan(
+  const renewal = await renewMemberPlan(
     {
       memberPlanId,
       notes,
     },
     profile,
   );
+  await notifySafely(() => sendRenewalConfirmationNotification(renewal.renewalId));
 
   revalidatePath("/admin/renewals");
   revalidatePath("/admin");

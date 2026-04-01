@@ -61,6 +61,13 @@ export const bookingStatusEnum = pgEnum("booking_status", [
   "no_show",
 ]);
 
+export const notificationStatusEnum = pgEnum("notification_status", [
+  "pending",
+  "sent",
+  "failed",
+  "skipped",
+]);
+
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
     .defaultNow()
@@ -287,6 +294,39 @@ export const auditLogs = pgTable("audit_logs", {
     .notNull(),
 });
 
+export const notificationDeliveries = pgTable(
+  "notification_deliveries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    channel: text("channel").notNull().default("email"),
+    audience: text("audience").notNull(),
+    eventType: text("event_type").notNull(),
+    recipientEmail: text("recipient_email").notNull(),
+    recipientName: text("recipient_name"),
+    subject: text("subject").notNull(),
+    dedupeKey: text("dedupe_key").notNull(),
+    status: notificationStatusEnum("status").notNull().default("pending"),
+    payload: jsonb("payload").notNull().default(sql`'{}'::jsonb`),
+    providerMessageId: text("provider_message_id"),
+    errorMessage: text("error_message"),
+    scheduledFor: timestamp("scheduled_for", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true, mode: "date" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    dedupeKeyIdx: uniqueIndex("notification_deliveries_dedupe_key_unique").on(
+      table.dedupeKey,
+    ),
+  }),
+);
+
 export const profilesRelations = relations(profiles, ({ many, one }) => ({
   member: one(members, {
     fields: [profiles.id],
@@ -435,3 +475,8 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
     references: [profiles.id],
   }),
 }));
+
+export const notificationDeliveriesRelations = relations(
+  notificationDeliveries,
+  () => ({}),
+);

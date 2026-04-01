@@ -91,5 +91,11 @@ export async function cancelBooking(
         quotaConsumed: booking.quotaConsumed,
       },
     });
+
+    return {
+      bookingId: booking.id,
+      status: newStatus,
+      refundedQuota: shouldRefund,
+    };
   });
 }
