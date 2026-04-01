@@ -1,13 +1,9 @@
+import { formatStudioDateTime, formatStudioDayMonth } from "@/lib/datetime";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireMemberContext } from "@/modules/auth/queries";
 import { getMemberPortalSnapshot, listMemberPlanBookings } from "@/modules/member-portal/queries";
-
-const dateFormatter = new Intl.DateTimeFormat("es-AR", {
-  day: "2-digit",
-  month: "short",
-});
 
 export default async function MemberPlanPage() {
   const { profile } = await requireMemberContext();
@@ -20,9 +16,9 @@ export default async function MemberPlanPage() {
     <div className="space-y-6">
       <div>
         <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Mi plan</p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight">Estado de tu membresía</h2>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight">Estado de tu membresia</h2>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Acá podés ver tu vigencia, los cupos disponibles y el historial reciente de consumo.
+          Aca podes ver tu vigencia, los cupos disponibles y el historial reciente de consumo.
         </p>
       </div>
 
@@ -30,7 +26,7 @@ export default async function MemberPlanPage() {
         <Card className="rounded-[28px] border-border/70 shadow-sm">
           <CardHeader>
             <CardTitle>Resumen del plan</CardTitle>
-            <CardDescription>Lectura rápida de tu ciclo actual.</CardDescription>
+            <CardDescription>Lectura rapida de tu ciclo actual.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
@@ -41,9 +37,7 @@ export default async function MemberPlanPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <article className="rounded-2xl border border-border/70 bg-background p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                  Cupos
-                </p>
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Cupos</p>
                 <p className="mt-2 text-3xl font-semibold">
                   {snapshot?.activePlan?.quotaRemaining ?? 0}
                 </p>
@@ -53,21 +47,17 @@ export default async function MemberPlanPage() {
               </article>
               <article className="rounded-2xl border border-border/70 bg-background p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                  Próximo pago
+                  Proximo pago
                 </p>
                 <p className="mt-2 text-3xl font-semibold">
-                  {snapshot?.activePlan
-                    ? dateFormatter.format(snapshot.activePlan.nextPaymentDueAt)
-                    : "--"}
+                  {snapshot?.activePlan ? formatStudioDayMonth(snapshot.activePlan.nextPaymentDueAt) : "--"}
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  renovación manual por staff
-                </p>
+                <p className="mt-1 text-sm text-muted-foreground">renovacion manual por staff</p>
               </article>
             </div>
             <div className="rounded-2xl border border-border/70 bg-background p-4">
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                Política de cancelación
+                Politica de cancelacion
               </p>
               <p className="mt-2 text-base font-medium">
                 {snapshot?.activePlan?.cancellationPolicyHours ?? 24}h antes del inicio
@@ -80,7 +70,7 @@ export default async function MemberPlanPage() {
           <CardHeader>
             <CardTitle>Consumo reciente</CardTitle>
             <CardDescription>
-              Últimas reservas asociadas a tu plan para que puedas seguir el uso de cupos.
+              Ultimas reservas asociadas a tu plan para que puedas seguir el uso de cupos.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -89,7 +79,7 @@ export default async function MemberPlanPage() {
                 <TableRow>
                   <TableHead>Espacio</TableHead>
                   <TableHead>Inicio</TableHead>
-                  <TableHead>Duración</TableHead>
+                  <TableHead>Duracion</TableHead>
                   <TableHead>Cupos</TableHead>
                   <TableHead>Estado</TableHead>
                 </TableRow>
@@ -98,14 +88,14 @@ export default async function MemberPlanPage() {
                 {bookings.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-muted-foreground">
-                      Todavía no tenés reservas asociadas a este plan.
+                      Todavia no tenes reservas asociadas a este plan.
                     </TableCell>
                   </TableRow>
                 ) : (
                   bookings.map((booking) => (
                     <TableRow key={booking.id}>
                       <TableCell>{booking.spaceName}</TableCell>
-                      <TableCell>{booking.startsAt.toLocaleString("es-AR")}</TableCell>
+                      <TableCell>{formatStudioDateTime(booking.startsAt)}</TableCell>
                       <TableCell>{booking.durationHours} h</TableCell>
                       <TableCell>{booking.quotaConsumed}</TableCell>
                       <TableCell>

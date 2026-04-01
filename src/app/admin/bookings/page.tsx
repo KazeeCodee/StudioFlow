@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { formatStudioDateTime } from "@/lib/datetime";
 import { cancelBookingAction } from "@/modules/bookings/actions";
 import { listAdminBookings } from "@/modules/bookings/queries";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ export default async function AdminBookingsPage() {
               {items.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-muted-foreground">
-                    Todavía no hay reservas creadas.
+                    Todavia no hay reservas creadas.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -53,8 +54,8 @@ export default async function AdminBookingsPage() {
                   <TableRow key={booking.id}>
                     <TableCell>{booking.memberName}</TableCell>
                     <TableCell>{booking.spaceName}</TableCell>
-                    <TableCell>{booking.startsAt.toLocaleString("es-AR")}</TableCell>
-                    <TableCell>{booking.endsAt.toLocaleString("es-AR")}</TableCell>
+                    <TableCell>{formatStudioDateTime(booking.startsAt)}</TableCell>
+                    <TableCell>{formatStudioDateTime(booking.endsAt)}</TableCell>
                     <TableCell>{booking.quotaConsumed}</TableCell>
                     <TableCell>{booking.status}</TableCell>
                     <TableCell className="text-right">

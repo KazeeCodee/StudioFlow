@@ -1,3 +1,4 @@
+import { formatStudioDateTime } from "@/lib/datetime";
 import { createSpaceBlockAction } from "@/modules/spaces/actions";
 import { getSpaceDetail } from "@/modules/spaces/queries";
 import { weekdayOptions } from "@/modules/spaces/schema";
@@ -15,7 +16,7 @@ type SpaceDetailPageProps = {
 };
 
 function getDayLabel(dayOfWeek: number) {
-  return weekdayOptions.find((day) => day.value === dayOfWeek)?.label ?? `Día ${dayOfWeek}`;
+  return weekdayOptions.find((day) => day.value === dayOfWeek)?.label ?? `Dia ${dayOfWeek}`;
 }
 
 export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) {
@@ -28,14 +29,14 @@ export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) 
         <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Espacios</p>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight">{space.name}</h2>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          {space.description ?? "Todavía no hay una descripción operativa para este espacio."}
+          {space.description ?? "Todavia no hay una descripcion operativa para este espacio."}
         </p>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="rounded-[28px] border-border/70">
           <CardHeader>
-            <CardTitle>Configuración general</CardTitle>
+            <CardTitle>Configuracion general</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-2xl border border-border/70 bg-background p-4">
@@ -47,11 +48,11 @@ export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) 
               <p className="mt-2 text-xl font-semibold">{space.hourlyQuotaCost} cupos</p>
             </div>
             <div className="rounded-2xl border border-border/70 bg-background p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Reserva mínima</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Reserva minima</p>
               <p className="mt-2 text-xl font-semibold">{space.minBookingHours}h</p>
             </div>
             <div className="rounded-2xl border border-border/70 bg-background p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Reserva máxima</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Reserva maxima</p>
               <p className="mt-2 text-xl font-semibold">{space.maxBookingHours}h</p>
             </div>
           </CardContent>
@@ -66,8 +67,8 @@ export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) 
               <input type="hidden" name="spaceId" value={space.id} />
 
               <div className="space-y-2">
-                <Label htmlFor="title">Título</Label>
-                <Input id="title" name="title" placeholder="Mantenimiento técnico" required />
+                <Label htmlFor="title">Titulo</Label>
+                <Input id="title" name="title" placeholder="Mantenimiento tecnico" required />
               </div>
 
               <div className="space-y-2">
@@ -100,7 +101,7 @@ export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Día</TableHead>
+                <TableHead>Dia</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Desde</TableHead>
                 <TableHead>Hasta</TableHead>
@@ -128,7 +129,7 @@ export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Título</TableHead>
+                <TableHead>Titulo</TableHead>
                 <TableHead>Motivo</TableHead>
                 <TableHead>Desde</TableHead>
                 <TableHead>Hasta</TableHead>
@@ -138,7 +139,7 @@ export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) 
               {space.blocks.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-muted-foreground">
-                    Todavía no hay bloqueos cargados para este espacio.
+                    Todavia no hay bloqueos cargados para este espacio.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -146,8 +147,8 @@ export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) 
                   <TableRow key={block.id}>
                     <TableCell>{block.title}</TableCell>
                     <TableCell>{block.reason ?? "Sin detalle"}</TableCell>
-                    <TableCell>{block.startsAt.toLocaleString("es-AR")}</TableCell>
-                    <TableCell>{block.endsAt.toLocaleString("es-AR")}</TableCell>
+                    <TableCell>{formatStudioDateTime(block.startsAt)}</TableCell>
+                    <TableCell>{formatStudioDateTime(block.endsAt)}</TableCell>
                   </TableRow>
                 ))
               )}

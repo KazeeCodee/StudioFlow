@@ -1,3 +1,4 @@
+import { formatStudioDate } from "@/lib/datetime";
 import { renewMemberPlanAction } from "@/modules/renewals/actions";
 import { listRenewalAlerts, listRecentRenewals } from "@/modules/alerts/queries";
 import { listRenewalCandidates } from "@/modules/renewals/queries";
@@ -20,14 +21,14 @@ export default async function RenewalsPage() {
         <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Renovaciones</p>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight">Seguimiento manual de pagos</h2>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Desde acá el staff detecta vencimientos, ve cupos bajos y registra manualmente que un miembro abonó su próximo ciclo.
+          Desde aca el staff detecta vencimientos, ve cupos bajos y registra manualmente que un miembro abono su proximo ciclo.
         </p>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
         <Card className="rounded-[28px] border-border/70">
           <CardHeader>
-            <CardTitle>Próximas renovaciones</CardTitle>
+            <CardTitle>Proximas renovaciones</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
@@ -42,7 +43,7 @@ export default async function RenewalsPage() {
                 {alerts.upcomingRenewals.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-muted-foreground">
-                      No hay vencimientos próximos en la ventana configurada.
+                      No hay vencimientos proximos en la ventana configurada.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -55,7 +56,7 @@ export default async function RenewalsPage() {
                         </div>
                       </TableCell>
                       <TableCell>{item.planName}</TableCell>
-                      <TableCell>{item.nextPaymentDueAt.toLocaleDateString("es-AR")}</TableCell>
+                      <TableCell>{formatStudioDate(item.nextPaymentDueAt)}</TableCell>
                     </TableRow>
                   ))
                 )}
@@ -81,7 +82,7 @@ export default async function RenewalsPage() {
                 {alerts.lowQuotaPlans.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-muted-foreground">
-                      No hay miembros con cupos críticos en este momento.
+                      No hay miembros con cupos criticos en este momento.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -136,7 +137,7 @@ export default async function RenewalsPage() {
                       </div>
                     </TableCell>
                     <TableCell>{item.planName}</TableCell>
-                    <TableCell>{item.nextPaymentDueAt.toLocaleDateString("es-AR")}</TableCell>
+                    <TableCell>{formatStudioDate(item.nextPaymentDueAt)}</TableCell>
                     <TableCell>
                       {item.quotaRemaining} / {item.quotaTotal}
                     </TableCell>
@@ -171,15 +172,15 @@ export default async function RenewalsPage() {
               <TableRow>
                 <TableHead>Miembro</TableHead>
                 <TableHead>Plan</TableHead>
-                <TableHead>Última renovación</TableHead>
-                <TableHead>Próximo control</TableHead>
+                <TableHead>Ultima renovacion</TableHead>
+                <TableHead>Proximo control</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {recentRenewals.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-muted-foreground">
-                    Aún no hay renovaciones registradas.
+                    Aun no hay renovaciones registradas.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -187,10 +188,8 @@ export default async function RenewalsPage() {
                   <TableRow key={item.id}>
                     <TableCell>{item.memberName}</TableCell>
                     <TableCell>{item.planName}</TableCell>
-                    <TableCell>
-                      {item.lastRenewedAt ? item.lastRenewedAt.toLocaleDateString("es-AR") : "Sin renovaciones"}
-                    </TableCell>
-                    <TableCell>{item.nextPaymentDueAt.toLocaleDateString("es-AR")}</TableCell>
+                    <TableCell>{item.lastRenewedAt ? formatStudioDate(item.lastRenewedAt) : "Sin renovaciones"}</TableCell>
+                    <TableCell>{formatStudioDate(item.nextPaymentDueAt)}</TableCell>
                   </TableRow>
                 ))
               )}

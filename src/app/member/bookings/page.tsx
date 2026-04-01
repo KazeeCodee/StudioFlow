@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { formatStudioDateTime } from "@/lib/datetime";
 import { cancelBookingAction } from "@/modules/bookings/actions";
 import { listMemberBookings } from "@/modules/bookings/queries";
 import { requireMemberContext } from "@/modules/auth/queries";
@@ -16,7 +17,7 @@ export default async function MemberBookingsPage() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Mis reservas</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight">Próximas y pasadas</h2>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight">Proximas y pasadas</h2>
         </div>
         <Button asChild>
           <Link href="/member/bookings/new">
@@ -46,15 +47,15 @@ export default async function MemberBookingsPage() {
               {items.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-muted-foreground">
-                    Todavía no tenés reservas cargadas.
+                    Todavia no tenes reservas cargadas.
                   </TableCell>
                 </TableRow>
               ) : (
                 items.map((booking) => (
                   <TableRow key={booking.id}>
                     <TableCell>{booking.spaceName}</TableCell>
-                    <TableCell>{booking.startsAt.toLocaleString("es-AR")}</TableCell>
-                    <TableCell>{booking.endsAt.toLocaleString("es-AR")}</TableCell>
+                    <TableCell>{formatStudioDateTime(booking.startsAt)}</TableCell>
+                    <TableCell>{formatStudioDateTime(booking.endsAt)}</TableCell>
                     <TableCell>{booking.quotaConsumed}</TableCell>
                     <TableCell>{booking.status}</TableCell>
                     <TableCell className="text-right">

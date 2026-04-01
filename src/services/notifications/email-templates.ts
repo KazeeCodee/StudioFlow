@@ -1,3 +1,4 @@
+import { formatStudioDateTime, formatStudioDayMonth } from "@/lib/datetime";
 import type { ReminderReason } from "@/services/notifications/build-daily-notification-plan";
 
 type EmailContent = {
@@ -31,23 +32,11 @@ type BookingTransactionalEmailInput = {
   appUrl: string;
 };
 
-const dateFormatter = new Intl.DateTimeFormat("es-AR", {
-  day: "2-digit",
-  month: "short",
-});
-
-const dateTimeFormatter = new Intl.DateTimeFormat("es-AR", {
-  day: "2-digit",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
 function renderReminderReasonText(reasons: ReminderReason[], quotaRemaining: number) {
   const lines: string[] = [];
 
   if (reasons.includes("renewal_due")) {
-    lines.push("Tu plan está próximo a vencer y requiere seguimiento.");
+    lines.push("Tu plan vence pronto y requiere seguimiento.");
   }
 
   if (reasons.includes("low_quota")) {
@@ -63,9 +52,9 @@ export function renderStaffDigestEmail({
   lowQuotaCount,
   appUrl,
 }: StaffDigestEmailInput): EmailContent {
-  const subject = `StudioFlow: ${upcomingRenewalsCount} renovaciones y ${lowQuotaCount} cupos críticos`;
-  const text = `Hola ${recipientName},\n\nTenés ${upcomingRenewalsCount} renovaciones próximas y ${lowQuotaCount} miembros con cupos críticos.\n\nRevisalo en ${appUrl}/admin/renewals`;
-  const html = `<p>Hola ${recipientName},</p><p>Tenés <strong>${upcomingRenewalsCount}</strong> renovaciones próximas y <strong>${lowQuotaCount}</strong> miembros con cupos críticos.</p><p>Revisalo en <a href="${appUrl}/admin/renewals">${appUrl}/admin/renewals</a>.</p>`;
+  const subject = `StudioFlow: ${upcomingRenewalsCount} renovaciones y ${lowQuotaCount} cupos criticos`;
+  const text = `Hola ${recipientName},\n\nTenes ${upcomingRenewalsCount} renovaciones proximas y ${lowQuotaCount} miembros con cupos criticos.\n\nRevisalo en ${appUrl}/admin/renewals`;
+  const html = `<p>Hola ${recipientName},</p><p>Tenes <strong>${upcomingRenewalsCount}</strong> renovaciones proximas y <strong>${lowQuotaCount}</strong> miembros con cupos criticos.</p><p>Revisalo en <a href="${appUrl}/admin/renewals">${appUrl}/admin/renewals</a>.</p>`;
 
   return { subject, text, html };
 }
@@ -80,8 +69,9 @@ export function renderMemberReminderEmail({
 }: MemberReminderEmailInput): EmailContent {
   const subject = `StudioFlow: recordatorio de tu ${planName}`;
   const reasonText = renderReminderReasonText(reasons, quotaRemaining);
-  const text = `Hola ${memberName},\n\n${reasonText}\nTu próximo control es el ${dateFormatter.format(nextPaymentDueAt)}.\n\nPodés revisar tu cuenta en ${appUrl}.`;
-  const html = `<p>Hola ${memberName},</p><p>${reasonText}</p><p>Tu próximo control es el <strong>${dateFormatter.format(nextPaymentDueAt)}</strong>.</p><p>Podés revisar tu cuenta en <a href="${appUrl}">${appUrl}</a>.</p>`;
+  const nextControl = formatStudioDayMonth(nextPaymentDueAt);
+  const text = `Hola ${memberName},\n\n${reasonText}\nTu proximo control es el ${nextControl}.\n\nPodes revisar tu cuenta en ${appUrl}.`;
+  const html = `<p>Hola ${memberName},</p><p>${reasonText}</p><p>Tu proximo control es el <strong>${nextControl}</strong>.</p><p>Podes revisar tu cuenta en <a href="${appUrl}">${appUrl}</a>.</p>`;
 
   return { subject, text, html };
 }
@@ -95,8 +85,10 @@ export function renderBookingTransactionalEmail({
   appUrl,
 }: BookingTransactionalEmailInput): EmailContent {
   const subject = `StudioFlow: tu reserva fue ${actionLabel}`;
-  const text = `Hola ${memberName},\n\nTu reserva en ${spaceName} fue ${actionLabel}.\nHorario: ${dateTimeFormatter.format(startsAt)} a ${dateTimeFormatter.format(endsAt)}.\n\nMás detalles en ${appUrl}/member/bookings`;
-  const html = `<p>Hola ${memberName},</p><p>Tu reserva en <strong>${spaceName}</strong> fue <strong>${actionLabel}</strong>.</p><p>Horario: ${dateTimeFormatter.format(startsAt)} a ${dateTimeFormatter.format(endsAt)}.</p><p>Más detalles en <a href="${appUrl}/member/bookings">${appUrl}/member/bookings</a>.</p>`;
+  const startLabel = formatStudioDateTime(startsAt);
+  const endLabel = formatStudioDateTime(endsAt);
+  const text = `Hola ${memberName},\n\nTu reserva en ${spaceName} fue ${actionLabel}.\nHorario: ${startLabel} a ${endLabel}.\n\nMas detalles en ${appUrl}/member/bookings`;
+  const html = `<p>Hola ${memberName},</p><p>Tu reserva en <strong>${spaceName}</strong> fue <strong>${actionLabel}</strong>.</p><p>Horario: ${startLabel} a ${endLabel}.</p><p>Mas detalles en <a href="${appUrl}/member/bookings">${appUrl}/member/bookings</a>.</p>`;
 
   return { subject, text, html };
 }
@@ -115,8 +107,9 @@ export function renderRenewalTransactionalEmail({
   appUrl: string;
 }): EmailContent {
   const subject = `StudioFlow: tu plan ${planName} fue renovado`;
-  const text = `Hola ${memberName},\n\nTu plan ${planName} fue renovado correctamente.\nNuevo próximo control: ${dateFormatter.format(nextPaymentDueAt)}.\nCupos disponibles: ${quotaRemaining}.\n\nPodés revisarlo en ${appUrl}/member/plan`;
-  const html = `<p>Hola ${memberName},</p><p>Tu plan <strong>${planName}</strong> fue renovado correctamente.</p><p>Nuevo próximo control: <strong>${dateFormatter.format(nextPaymentDueAt)}</strong>.</p><p>Cupos disponibles: <strong>${quotaRemaining}</strong>.</p><p>Podés revisarlo en <a href="${appUrl}/member/plan">${appUrl}/member/plan</a>.</p>`;
+  const nextControl = formatStudioDayMonth(nextPaymentDueAt);
+  const text = `Hola ${memberName},\n\nTu plan ${planName} fue renovado correctamente.\nNuevo proximo control: ${nextControl}.\nCupos disponibles: ${quotaRemaining}.\n\nPodes revisarlo en ${appUrl}/member/plan`;
+  const html = `<p>Hola ${memberName},</p><p>Tu plan <strong>${planName}</strong> fue renovado correctamente.</p><p>Nuevo proximo control: <strong>${nextControl}</strong>.</p><p>Cupos disponibles: <strong>${quotaRemaining}</strong>.</p><p>Podes revisarlo en <a href="${appUrl}/member/plan">${appUrl}/member/plan</a>.</p>`;
 
   return { subject, text, html };
 }

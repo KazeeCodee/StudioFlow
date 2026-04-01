@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { formatStudioDate } from "@/lib/datetime";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -42,7 +43,7 @@ export default async function MembersPage() {
               {items.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-muted-foreground">
-                    Todavía no hay miembros creados.
+                    Todavia no hay miembros creados.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -57,11 +58,7 @@ export default async function MembersPage() {
                     <TableCell>{member.status}</TableCell>
                     <TableCell>{member.planName ?? "Sin plan"}</TableCell>
                     <TableCell>{member.quotaRemaining ?? "-"}</TableCell>
-                    <TableCell>
-                      {member.activePlanEndsAt
-                        ? member.activePlanEndsAt.toLocaleDateString("es-AR")
-                        : "-"}
-                    </TableCell>
+                    <TableCell>{member.activePlanEndsAt ? formatStudioDate(member.activePlanEndsAt) : "-"}</TableCell>
                   </TableRow>
                 ))
               )}

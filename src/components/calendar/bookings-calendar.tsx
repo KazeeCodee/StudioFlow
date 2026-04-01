@@ -4,6 +4,7 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import timeGridPlugin from "@fullcalendar/timegrid";
+import { formatStudioDate, formatStudioTime } from "@/lib/datetime";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -71,7 +72,7 @@ export function BookingsCalendar({ events }: BookingsCalendarProps) {
                 today: "Hoy",
                 month: "Mes",
                 week: "Semana",
-                day: "Día",
+                day: "Dia",
               }}
               allDaySlot={false}
               locale="es"
@@ -114,26 +115,16 @@ export function BookingsCalendar({ events }: BookingsCalendarProps) {
                 className="grid gap-3 rounded-2xl border border-border/70 bg-background px-4 py-3 md:grid-cols-[140px_1fr_auto]"
               >
                 <div className="text-sm text-muted-foreground">
-                  <p>{new Date(event.start).toLocaleDateString("es-AR")}</p>
+                  <p>{formatStudioDate(new Date(event.start))}</p>
                   <p>
-                    {new Date(event.start).toLocaleTimeString("es-AR", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}{" "}
-                    -{" "}
-                    {new Date(event.end).toLocaleTimeString("es-AR", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatStudioTime(new Date(event.start))} - {formatStudioTime(new Date(event.end))}
                   </p>
                 </div>
                 <div>
                   <p className="font-medium">{event.title}</p>
                   <p className="text-sm text-muted-foreground">
                     {event.extendedProps.resourceLabel}
-                    {event.extendedProps.secondaryLabel
-                      ? ` · ${event.extendedProps.secondaryLabel}`
-                      : ""}
+                    {event.extendedProps.secondaryLabel ? ` · ${event.extendedProps.secondaryLabel}` : ""}
                   </p>
                 </div>
                 <div className="md:self-center">

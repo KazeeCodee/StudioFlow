@@ -1,5 +1,11 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import {
+  getStudioDateTimeParts,
+  getStudioMinutesSinceMidnight,
+  isSameStudioDay,
+  parseStudioDateTimeInput,
+} from "@/lib/datetime";
 import { auditLogs, bookingStatusHistory, bookings, memberPlans } from "@/lib/db/schema";
 import type { AuthenticatedProfile } from "@/modules/auth/types";
 import type { BookingInput } from "@/modules/bookings/schema";
@@ -12,27 +18,7 @@ import {
 } from "@/modules/bookings/queries";
 import { getOperationalSettings } from "@/modules/settings/queries";
 import { calculateBookingQuota } from "@/services/bookings/calculate-booking-quota";
-import {
-  applyBookingBuffer,
-  hasOverlap,
-} from "@/services/bookings/check-availability";
-
-function parseLocalDateTime(value: string) {
-  const [datePart, timePart] = value.split("T");
-
-  if (!datePart || !timePart) {
-    throw new Error("Fecha inválida.");
-  }
-
-  const [year, month, day] = datePart.split("-").map(Number);
-  const [hours, minutes] = timePart.split(":").map(Number);
-
-  if ([year, month, day, hours, minutes].some((part) => Number.isNaN(part))) {
-    throw new Error("Fecha inválida.");
-  }
-
-  return new Date(Date.UTC(year, month - 1, day, hours, minutes, 0));
-}
+import { applyBookingBuffer, hasOverlap } from "@/services/bookings/check-availability";
 
 function parseTimeToMinutes(value: string) {
   const [hours, minutes] = value.split(":").map(Number);
@@ -40,8 +26,8 @@ function parseTimeToMinutes(value: string) {
 }
 
 function validateBookingWindow(startsAtInput: string, endsAtInput: string) {
-  const startsAt = parseLocalDateTime(startsAtInput);
-  const endsAt = parseLocalDateTime(endsAtInput);
+  const startsAt = parseStudioDateTimeInput(startsAtInput);
+  const endsAt = parseStudioDateTimeInput(endsAtInput);
 
   if (endsAt <= startsAt) {
     throw new Error("El fin debe ser posterior al inicio.");
@@ -56,12 +42,8 @@ function validateBookingWindow(startsAtInput: string, endsAtInput: string) {
     throw new Error("Las reservas deben comenzar y terminar en horas enteras.");
   }
 
-  if (
-    startsAt.getUTCFullYear() !== endsAt.getUTCFullYear() ||
-    startsAt.getUTCMonth() !== endsAt.getUTCMonth() ||
-    startsAt.getUTCDate() !== endsAt.getUTCDate()
-  ) {
-    throw new Error("La reserva debe quedar dentro del mismo día.");
+  if (!isSameStudioDay(startsAt, endsAt)) {
+    throw new Error("La reserva debe quedar dentro del mismo dia.");
   }
 
   const durationHours = (endsAt.getTime() - startsAt.getTime()) / 3_600_000;
@@ -91,15 +73,15 @@ function assertWithinAvailability({
     isActive: boolean;
   }[];
 }) {
-  const dayOfWeek = startsAt.getUTCDay();
+  const dayOfWeek = getStudioDateTimeParts(startsAt).dayOfWeek;
   const rule = availabilityRules.find((item) => item.dayOfWeek === dayOfWeek && item.isActive);
 
   if (!rule) {
-    throw new Error("El espacio no opera en el día seleccionado.");
+    throw new Error("El espacio no opera en el dia seleccionado.");
   }
 
-  const bookingStart = startsAt.getUTCHours() * 60 + startsAt.getUTCMinutes();
-  const bookingEnd = endsAt.getUTCHours() * 60 + endsAt.getUTCMinutes();
+  const bookingStart = getStudioMinutesSinceMidnight(startsAt);
+  const bookingEnd = getStudioMinutesSinceMidnight(endsAt);
   const ruleStart = parseTimeToMinutes(rule.startTime);
   const ruleEnd = parseTimeToMinutes(rule.endTime);
 
@@ -108,14 +90,9 @@ function assertWithinAvailability({
   }
 }
 
-export async function createBooking(
-  input: BookingInput,
-  actor: AuthenticatedProfile,
-) {
+export async function createBooking(input: BookingInput, actor: AuthenticatedProfile) {
   const targetMemberId =
-    actor.role === "member"
-      ? (await getMemberByProfileId(actor.id))?.id
-      : input.memberId;
+    actor.role === "member" ? (await getMemberByProfileId(actor.id))?.id : input.memberId;
 
   if (!targetMemberId) {
     throw new Error("No encontramos el miembro para esta reserva.");
@@ -140,15 +117,15 @@ export async function createBooking(
   }
 
   if (space.status !== "active") {
-    throw new Error("El espacio no está disponible para reservas.");
+    throw new Error("El espacio no esta disponible para reservas.");
   }
 
   if (memberPlan.endsAt < startsAt) {
-    throw new Error("El plan del miembro está vencido.");
+    throw new Error("El plan del miembro esta vencido.");
   }
 
   if (durationHours < space.minBookingHours || durationHours > space.maxBookingHours) {
-    throw new Error("La duración no respeta los límites del espacio.");
+    throw new Error("La duracion no respeta los limites del espacio.");
   }
 
   assertWithinAvailability({
@@ -157,18 +134,11 @@ export async function createBooking(
     availabilityRules: space.availabilityRules,
   });
 
-  const bufferedInterval = applyBookingBuffer(
-    { startsAt, endsAt },
-    settings.bookingBufferHours,
-  );
+  const bufferedInterval = applyBookingBuffer({ startsAt, endsAt }, settings.bookingBufferHours);
 
   const [blockingBlocks, conflictingBookings] = await Promise.all([
     getOverlappingSpaceBlocks(space.id, startsAt, endsAt),
-    getOverlappingBookings(
-      space.id,
-      bufferedInterval.startsAt,
-      bufferedInterval.endsAt,
-    ),
+    getOverlappingBookings(space.id, bufferedInterval.startsAt, bufferedInterval.endsAt),
   ]);
 
   if (blockingBlocks.length > 0) {
@@ -232,13 +202,13 @@ export async function createBooking(
       action: "booking.created",
       entityType: "booking",
       entityId: booking.id,
-        metadata: {
-          memberId: targetMemberId,
-          spaceId: space.id,
-          quotaConsumed,
-          bookingBufferHours: settings.bookingBufferHours,
-        },
-      });
+      metadata: {
+        memberId: targetMemberId,
+        spaceId: space.id,
+        quotaConsumed,
+        bookingBufferHours: settings.bookingBufferHours,
+      },
+    });
 
     return booking;
   });

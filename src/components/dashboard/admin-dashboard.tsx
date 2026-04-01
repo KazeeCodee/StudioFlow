@@ -7,6 +7,7 @@ import {
   Users,
   WalletCards,
 } from "lucide-react";
+import { formatStudioDayMonth, formatStudioTime } from "@/lib/datetime";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,16 +31,6 @@ import type { AdminDashboardData } from "@/modules/dashboard/queries";
 type AdminDashboardProps = {
   data: AdminDashboardData;
 };
-
-const timeFormatter = new Intl.DateTimeFormat("es-AR", {
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-const dateFormatter = new Intl.DateTimeFormat("es-AR", {
-  day: "2-digit",
-  month: "2-digit",
-});
 
 const metricCards = [
   {
@@ -68,7 +59,7 @@ const metricCards = [
   },
   {
     key: "upcomingRenewals",
-    label: "Renovaciones próximas",
+    label: "Renovaciones proximas",
     icon: CreditCard,
     tone:
       "border-rose-200/80 bg-rose-50/70 text-rose-950 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-100",
@@ -76,7 +67,7 @@ const metricCards = [
   },
   {
     key: "lowQuotaPlans",
-    label: "Cupos críticos",
+    label: "Cupos criticos",
     icon: WalletCards,
     tone:
       "border-violet-200/80 bg-violet-50/70 text-violet-950 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-100",
@@ -91,7 +82,7 @@ function getStatusBadgeLabel(status: AdminDashboardData["todayAgenda"][number]["
     case "completed":
       return "Completada";
     case "no_show":
-      return "No asistió";
+      return "No asistio";
     default:
       return "Pendiente";
   }
@@ -109,7 +100,7 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
       <PageHeader
         eyebrow="Dashboard"
         title="Pulso operativo del estudio"
-        subtitle="Una lectura rápida del día para saber cómo viene la agenda, qué membresías requieren seguimiento y dónde se está concentrando el uso del estudio."
+        subtitle="Una lectura rapida del dia para saber como viene la agenda, que membresias requieren seguimiento y donde se esta concentrando el uso del estudio."
         statusLabel={`${data.metrics.upcomingRenewals} seguimientos esta semana`}
       />
 
@@ -144,7 +135,7 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
           <CardHeader>
             <CardTitle>Agenda de hoy</CardTitle>
             <CardDescription>
-              Reservas activas del día con su franja, espacio y consumo de cupos.
+              Reservas activas del dia con su franja, espacio y consumo de cupos.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -169,7 +160,7 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
                   data.todayAgenda.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
-                        {timeFormatter.format(item.startsAt)} - {timeFormatter.format(item.endsAt)}
+                        {formatStudioTime(item.startsAt)} - {formatStudioTime(item.endsAt)}
                       </TableCell>
                       <TableCell className="font-medium">{item.memberName}</TableCell>
                       <TableCell>{item.spaceName}</TableCell>
@@ -187,9 +178,9 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
 
         <Card className="rounded-[28px] border-border/70 shadow-sm">
           <CardHeader>
-            <CardTitle>Accesos rápidos</CardTitle>
+            <CardTitle>Accesos rapidos</CardTitle>
             <CardDescription>
-              Entradas directas a las pantallas que más se usan durante la operación.
+              Entradas directas a las pantallas que mas se usan durante la operacion.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
@@ -225,14 +216,12 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
         <Card className="rounded-[28px] border-border/70 shadow-sm">
           <CardHeader>
             <CardTitle>Uso por espacio</CardTitle>
-            <CardDescription>
-              Distribución de horas reservadas de la semana actual.
-            </CardDescription>
+            <CardDescription>Distribucion de horas reservadas de la semana actual.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {data.spaceUsage.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Aún no hay horas reservadas en esta semana.
+                Aun no hay horas reservadas en esta semana.
               </p>
             ) : (
               data.spaceUsage.map((item) => (
@@ -268,14 +257,12 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
           <CardHeader>
             <CardTitle>Cancelaciones recientes</CardTitle>
             <CardDescription>
-              Últimos movimientos cancelados para detectar huecos operativos.
+              Ultimos movimientos cancelados para detectar huecos operativos.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {data.recentCancellations.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No se registraron cancelaciones recientes.
-              </p>
+              <p className="text-sm text-muted-foreground">No se registraron cancelaciones recientes.</p>
             ) : (
               data.recentCancellations.map((item) => (
                 <article
@@ -286,12 +273,10 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
                     <div>
                       <p className="font-medium">{item.memberName}</p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {item.spaceName} · {dateFormatter.format(item.startsAt)}
+                        {item.spaceName} · {formatStudioDayMonth(item.startsAt)}
                       </p>
                     </div>
-                    <Badge variant="outline">
-                      {getCancellationBadgeLabel(item.status)}
-                    </Badge>
+                    <Badge variant="outline">{getCancellationBadgeLabel(item.status)}</Badge>
                   </div>
                 </article>
               ))

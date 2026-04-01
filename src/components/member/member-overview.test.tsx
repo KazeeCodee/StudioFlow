@@ -26,7 +26,7 @@ describe("MemberOverview", () => {
     expect(screen.getByText("Plan Creator")).toBeInTheDocument();
     expect(screen.getByText("8")).toBeInTheDocument();
     expect(screen.getByText("3 reservas por delante")).toBeInTheDocument();
-    expect(screen.getByText("Próxima reserva")).toBeInTheDocument();
+    expect(screen.getByText("Proxima reserva")).toBeInTheDocument();
     expect(screen.getByText(/Estudio A/)).toBeInTheDocument();
   });
 });

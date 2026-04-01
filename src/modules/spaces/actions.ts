@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
+import { parseStudioDateTimeInput } from "@/lib/datetime";
 import { auditLogs, spaceAvailabilityRules, spaceBlocks, spaces } from "@/lib/db/schema";
+import { slugify } from "@/lib/utils";
 import { requireStaffContext } from "@/modules/auth/queries";
 import { spaceBlockSchema, spaceSchema } from "@/modules/spaces/schema";
-import { slugify } from "@/lib/utils";
 
 function readAvailabilityRules(formData: FormData) {
   return Array.from({ length: 7 }, (_, dayOfWeek) => ({
@@ -91,8 +92,8 @@ export async function createSpaceBlockAction(formData: FormData) {
       spaceId,
       title: input.title,
       reason: input.reason,
-      startsAt: new Date(input.startsAt),
-      endsAt: new Date(input.endsAt),
+      startsAt: parseStudioDateTimeInput(input.startsAt),
+      endsAt: parseStudioDateTimeInput(input.endsAt),
       createdBy: profile.id,
     })
     .returning({ id: spaceBlocks.id });
