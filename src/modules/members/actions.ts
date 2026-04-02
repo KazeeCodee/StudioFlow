@@ -1,11 +1,12 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
-import { auditLogs, members, profiles } from "@/lib/db/schema";
+import { auditLogs, bookings, memberPlans, members, profiles, renewals } from "@/lib/db/schema";
 import { canManageMembers } from "@/lib/permissions/guards";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireStaffContext } from "@/modules/auth/queries";
 import type { AppRole } from "@/modules/auth/types";
 import {
@@ -198,4 +199,80 @@ export async function changeMemberPlanAction(formData: FormData) {
 
   revalidateMemberPaths(memberId);
   redirect(`/admin/members/${memberId}`);
+}
+
+export async function deleteMemberAction(formData: FormData) {
+  const { profile } = await requireStaffContext();
+  assertCanManageMembers(profile.role);
+
+  const memberId = String(formData.get("memberId") ?? "");
+
+  if (!memberId) {
+    throw new Error("Falta el miembro a eliminar.");
+  }
+
+  const db = getDb();
+  const [memberRecord] = await db
+    .select({
+      id: members.id,
+      profileId: members.profileId,
+      fullName: members.fullName,
+    })
+    .from(members)
+    .where(eq(members.id, memberId))
+    .limit(1);
+
+  if (!memberRecord) {
+    throw new Error("No encontramos el miembro solicitado.");
+  }
+
+  const [[{ bookingCount }], [{ planCount }], [{ renewalCount }]] = await Promise.all([
+    db
+      .select({ bookingCount: count() })
+      .from(bookings)
+      .where(eq(bookings.memberId, memberId)),
+    db
+      .select({ planCount: count() })
+      .from(memberPlans)
+      .where(eq(memberPlans.memberId, memberId)),
+    db
+      .select({ renewalCount: count() })
+      .from(renewals)
+      .where(eq(renewals.memberId, memberId)),
+  ]);
+
+  if (bookingCount > 0 || planCount > 0 || renewalCount > 0) {
+    throw new Error("No se puede eliminar el miembro mientras conserve historial operativo.");
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.insert(auditLogs).values({
+      actorId: profile.id,
+      actorRole: profile.role,
+      action: "member.deleted",
+      entityType: "member",
+      entityId: memberRecord.id,
+      metadata: {
+        fullName: memberRecord.fullName,
+      },
+    });
+
+    await tx.delete(members).where(eq(members.id, memberId));
+
+    if (memberRecord.profileId) {
+      await tx.delete(profiles).where(eq(profiles.id, memberRecord.profileId));
+    }
+  });
+
+  if (memberRecord.profileId) {
+    const adminClient = createSupabaseAdminClient();
+    const result = await adminClient.auth.admin.deleteUser(memberRecord.profileId);
+
+    if (result.error) {
+      console.error("No se pudo borrar el usuario auth del miembro eliminado:", result.error.message);
+    }
+  }
+
+  revalidateMemberPaths();
+  redirect("/admin/members");
 }

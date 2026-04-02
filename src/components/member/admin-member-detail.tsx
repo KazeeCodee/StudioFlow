@@ -2,11 +2,13 @@ import { formatStudioDate, formatStudioDateTime } from "@/lib/datetime";
 import {
   adjustMemberQuotaAction,
   changeMemberPlanAction,
+  deleteMemberAction,
   updateMemberProfileAction,
   updateMemberStatusAction,
 } from "@/modules/members/actions";
 import type { getMemberDetail } from "@/modules/members/queries";
 import type { listActivePlanOptions } from "@/modules/plans/queries";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -249,6 +251,48 @@ export function AdminMemberDetail({
               )}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[28px] border-border/70">
+        <CardHeader>
+          <CardTitle>Zona de acciones</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Ocultá el miembro para sacarlo de la operación diaria. La eliminación total solo se
+            habilita si no conserva historial operativo.
+          </p>
+
+          <div className="flex flex-wrap gap-3">
+            <form action={updateMemberStatusAction}>
+              <input type="hidden" name="memberId" value={member.id} />
+              <input type="hidden" name="status" value="inactive" />
+              <input type="hidden" name="reason" value="Ocultado desde la zona de acciones." />
+              <Button type="submit" variant="outline" disabled={member.status === "inactive"}>
+                Ocultar miembro
+              </Button>
+            </form>
+
+            {member.deleteSummary.canDelete ? (
+              <form action={deleteMemberAction}>
+                <input type="hidden" name="memberId" value={member.id} />
+                <Button type="submit" variant="destructive">
+                  Eliminar miembro
+                </Button>
+              </form>
+            ) : (
+              <Alert variant="destructive" className="max-w-xl">
+                <AlertTitle>Eliminación bloqueada</AlertTitle>
+                <AlertDescription>
+                  No se puede eliminar mientras conserve historial operativo.
+                  {` Reservas: ${member.deleteSummary.bookingCount}.`}
+                  {` Planes: ${member.deleteSummary.planCount}.`}
+                  {` Renovaciones: ${member.deleteSummary.renewalCount}.`}
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -1,7 +1,7 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
-import { spaceAvailabilityRules, spaceBlocks, spaces } from "@/lib/db/schema";
+import { bookings, spaceAvailabilityRules, spaceBlocks, spaces } from "@/lib/db/schema";
 
 export async function listSpaces() {
   const db = getDb();
@@ -105,8 +105,17 @@ export async function getSpaceDetail(spaceId: string) {
     .where(eq(spaceBlocks.spaceId, space.id))
     .orderBy(desc(spaceBlocks.startsAt));
 
+  const [{ bookingCount }] = await db
+    .select({ bookingCount: count() })
+    .from(bookings)
+    .where(eq(bookings.spaceId, space.id));
+
   return {
     ...space,
+    deleteSummary: {
+      canDelete: bookingCount === 0,
+      bookingCount,
+    },
     availability,
     blocks,
   };

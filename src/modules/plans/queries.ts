@@ -1,7 +1,7 @@
-import { desc, eq } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
-import { plans } from "@/lib/db/schema";
+import { memberPlans, plans } from "@/lib/db/schema";
 
 export async function listPlans() {
   const db = getDb();
@@ -64,5 +64,16 @@ export async function getPlanDetail(planId: string) {
     notFound();
   }
 
-  return plan;
+  const [{ memberPlanCount }] = await db
+    .select({ memberPlanCount: count() })
+    .from(memberPlans)
+    .where(eq(memberPlans.planId, plan.id));
+
+  return {
+    ...plan,
+    deleteSummary: {
+      canDelete: memberPlanCount === 0,
+      memberPlanCount,
+    },
+  };
 }

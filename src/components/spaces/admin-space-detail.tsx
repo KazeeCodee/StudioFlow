@@ -1,11 +1,14 @@
 import { formatStudioDateTime } from "@/lib/datetime";
 import {
   createSpaceBlockAction,
+  deleteSpaceAction,
   deleteSpaceBlockAction,
   updateSpaceAction,
+  updateSpaceStatusAction,
 } from "@/modules/spaces/actions";
 import type { getSpaceDetail } from "@/modules/spaces/queries";
 import { weekdayOptions } from "@/modules/spaces/schema";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SpaceForm } from "@/components/forms/space-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -177,6 +180,46 @@ export function AdminSpaceDetail({ space }: AdminSpaceDetailProps) {
               )}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[28px] border-border/70">
+        <CardHeader>
+          <CardTitle>Zona de acciones</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Ocultá el espacio para retirarlo del catálogo y de la operación activa. La eliminación
+            total solo se habilita si nunca tuvo reservas asociadas.
+          </p>
+
+          <div className="flex flex-wrap gap-3">
+            <form action={updateSpaceStatusAction}>
+              <input type="hidden" name="spaceId" value={space.id} />
+              <input type="hidden" name="status" value="inactive" />
+              <input type="hidden" name="reason" value="Ocultado desde la zona de acciones." />
+              <Button type="submit" variant="outline" disabled={space.status === "inactive"}>
+                Ocultar espacio
+              </Button>
+            </form>
+
+            {space.deleteSummary.canDelete ? (
+              <form action={deleteSpaceAction}>
+                <input type="hidden" name="spaceId" value={space.id} />
+                <Button type="submit" variant="destructive">
+                  Eliminar espacio
+                </Button>
+              </form>
+            ) : (
+              <Alert variant="destructive" className="max-w-xl">
+                <AlertTitle>Eliminación bloqueada</AlertTitle>
+                <AlertDescription>
+                  No se puede eliminar mientras tenga reservas asociadas.
+                  {` Reservas encontradas: ${space.deleteSummary.bookingCount}.`}
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

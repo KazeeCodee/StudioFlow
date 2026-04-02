@@ -1,6 +1,7 @@
 import { formatStudioDateTime } from "@/lib/datetime";
-import { updatePlanAction, updatePlanStatusAction } from "@/modules/plans/actions";
+import { deletePlanAction, updatePlanAction, updatePlanStatusAction } from "@/modules/plans/actions";
 import type { getPlanDetail } from "@/modules/plans/queries";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PlanForm } from "@/components/forms/plan-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -120,6 +121,46 @@ export function AdminPlanDetail({ plan }: AdminPlanDetailProps) {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="rounded-[28px] border-border/70">
+        <CardHeader>
+          <CardTitle>Zona de acciones</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Archivá el plan para ocultarlo del alta operativa. La eliminación total solo se
+            habilita cuando no tiene asignaciones históricas.
+          </p>
+
+          <div className="flex flex-wrap gap-3">
+            <form action={updatePlanStatusAction}>
+              <input type="hidden" name="planId" value={plan.id} />
+              <input type="hidden" name="status" value="archived" />
+              <input type="hidden" name="reason" value="Archivado desde la zona de acciones." />
+              <Button type="submit" variant="outline" disabled={plan.status === "archived"}>
+                Ocultar plan
+              </Button>
+            </form>
+
+            {plan.deleteSummary.canDelete ? (
+              <form action={deletePlanAction}>
+                <input type="hidden" name="planId" value={plan.id} />
+                <Button type="submit" variant="destructive">
+                  Eliminar plan
+                </Button>
+              </form>
+            ) : (
+              <Alert variant="destructive" className="max-w-xl">
+                <AlertTitle>Eliminación bloqueada</AlertTitle>
+                <AlertDescription>
+                  No se puede eliminar mientras esté asignado a miembros.
+                  {` Asignaciones encontradas: ${plan.deleteSummary.memberPlanCount}.`}
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

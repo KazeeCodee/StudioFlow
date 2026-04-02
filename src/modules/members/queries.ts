@@ -1,7 +1,7 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
-import { memberPlans, members, plans, profiles } from "@/lib/db/schema";
+import { bookings, memberPlans, members, plans, profiles, renewals } from "@/lib/db/schema";
 
 export async function listMembers() {
   const db = getDb();
@@ -88,6 +88,21 @@ export async function getMemberDetail(memberId: string) {
     .orderBy(desc(memberPlans.createdAt))
     .limit(6);
 
+  const [[{ bookingCount }], [{ planCount }], [{ renewalCount }]] = await Promise.all([
+    db
+      .select({ bookingCount: count() })
+      .from(bookings)
+      .where(eq(bookings.memberId, member.id)),
+    db
+      .select({ planCount: count() })
+      .from(memberPlans)
+      .where(eq(memberPlans.memberId, member.id)),
+    db
+      .select({ renewalCount: count() })
+      .from(renewals)
+      .where(eq(renewals.memberId, member.id)),
+  ]);
+
   return {
     id: member.id,
     profileId: member.profileId,
@@ -98,6 +113,12 @@ export async function getMemberDetail(memberId: string) {
     notes: member.notes,
     createdAt: member.createdAt,
     updatedAt: member.updatedAt,
+    deleteSummary: {
+      canDelete: bookingCount === 0 && planCount === 0 && renewalCount === 0,
+      bookingCount,
+      planCount,
+      renewalCount,
+    },
     activePlan: activePlan ?? null,
     planHistory,
   };

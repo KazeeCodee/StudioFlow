@@ -1,11 +1,11 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { parseStudioDateTimeInput } from "@/lib/datetime";
-import { auditLogs, spaceAvailabilityRules, spaceBlocks, spaces } from "@/lib/db/schema";
+import { auditLogs, bookings, spaceAvailabilityRules, spaceBlocks, spaces } from "@/lib/db/schema";
 import { canManageSpaces } from "@/lib/permissions/guards";
 import { slugify } from "@/lib/utils";
 import { requireStaffContext } from "@/modules/auth/queries";
@@ -241,4 +241,111 @@ export async function deleteSpaceBlockAction(formData: FormData) {
 
   revalidateSpacePaths(spaceId);
   redirect(`/admin/spaces/${spaceId}`);
+}
+
+export async function updateSpaceStatusAction(formData: FormData) {
+  const { profile } = await requireStaffContext();
+  assertCanManageSpaces(profile.role);
+
+  const spaceId = String(formData.get("spaceId") ?? "");
+  const status = String(formData.get("status") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim() || null;
+
+  if (!spaceId) {
+    throw new Error("Falta el espacio a actualizar.");
+  }
+
+  if (!["active", "inactive", "maintenance"].includes(status)) {
+    throw new Error("Estado de espacio inválido.");
+  }
+
+  const db = getDb();
+  const [currentSpace] = await db
+    .select({
+      id: spaces.id,
+      name: spaces.name,
+      status: spaces.status,
+    })
+    .from(spaces)
+    .where(eq(spaces.id, spaceId))
+    .limit(1);
+
+  if (!currentSpace) {
+    throw new Error("No encontramos el espacio solicitado.");
+  }
+
+  await db
+    .update(spaces)
+    .set({
+      status: status as "active" | "inactive" | "maintenance",
+      updatedAt: new Date(),
+    })
+    .where(eq(spaces.id, spaceId));
+
+  await db.insert(auditLogs).values({
+    actorId: profile.id,
+    actorRole: profile.role,
+    action: "space.status_changed",
+    entityType: "space",
+    entityId: spaceId,
+    metadata: {
+      name: currentSpace.name,
+      previousStatus: currentSpace.status,
+      status,
+      reason,
+    },
+  });
+
+  revalidateSpacePaths(spaceId);
+  redirect(`/admin/spaces/${spaceId}`);
+}
+
+export async function deleteSpaceAction(formData: FormData) {
+  const { profile } = await requireStaffContext();
+  assertCanManageSpaces(profile.role);
+
+  const spaceId = String(formData.get("spaceId") ?? "");
+
+  if (!spaceId) {
+    throw new Error("Falta el espacio a eliminar.");
+  }
+
+  const db = getDb();
+  const [currentSpace] = await db
+    .select({
+      id: spaces.id,
+      name: spaces.name,
+    })
+    .from(spaces)
+    .where(eq(spaces.id, spaceId))
+    .limit(1);
+
+  if (!currentSpace) {
+    throw new Error("No encontramos el espacio solicitado.");
+  }
+
+  const [{ bookingCount }] = await db
+    .select({ bookingCount: count() })
+    .from(bookings)
+    .where(eq(bookings.spaceId, spaceId));
+
+  if (bookingCount > 0) {
+    throw new Error("No se puede eliminar el espacio mientras tenga reservas asociadas.");
+  }
+
+  await db.delete(spaces).where(eq(spaces.id, spaceId));
+
+  await db.insert(auditLogs).values({
+    actorId: profile.id,
+    actorRole: profile.role,
+    action: "space.deleted",
+    entityType: "space",
+    entityId: spaceId,
+    metadata: {
+      name: currentSpace.name,
+    },
+  });
+
+  revalidateSpacePaths();
+  redirect("/admin/spaces");
 }

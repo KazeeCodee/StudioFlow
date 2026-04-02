@@ -1,10 +1,10 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
-import { auditLogs, plans } from "@/lib/db/schema";
+import { auditLogs, memberPlans, plans } from "@/lib/db/schema";
 import { canManagePlans } from "@/lib/permissions/guards";
 import { requireStaffContext } from "@/modules/auth/queries";
 import type { AppRole } from "@/modules/auth/types";
@@ -171,4 +171,54 @@ export async function updatePlanStatusAction(formData: FormData) {
 
   revalidatePlanPaths(planId);
   redirect(`/admin/plans/${planId}`);
+}
+
+export async function deletePlanAction(formData: FormData) {
+  const { profile } = await requireStaffContext();
+  assertCanManagePlans(profile.role);
+
+  const planId = String(formData.get("planId") ?? "");
+
+  if (!planId) {
+    throw new Error("Falta el plan a eliminar.");
+  }
+
+  const db = getDb();
+  const [currentPlan] = await db
+    .select({
+      id: plans.id,
+      name: plans.name,
+    })
+    .from(plans)
+    .where(eq(plans.id, planId))
+    .limit(1);
+
+  if (!currentPlan) {
+    throw new Error("No encontramos el plan solicitado.");
+  }
+
+  const [{ memberPlanCount }] = await db
+    .select({ memberPlanCount: count() })
+    .from(memberPlans)
+    .where(eq(memberPlans.planId, planId));
+
+  if (memberPlanCount > 0) {
+    throw new Error("No se puede eliminar el plan mientras esté asignado a miembros.");
+  }
+
+  await db.delete(plans).where(eq(plans.id, planId));
+
+  await db.insert(auditLogs).values({
+    actorId: profile.id,
+    actorRole: profile.role,
+    action: "plan.deleted",
+    entityType: "plan",
+    entityId: planId,
+    metadata: {
+      name: currentPlan.name,
+    },
+  });
+
+  revalidatePlanPaths();
+  redirect("/admin/plans");
 }

@@ -13,6 +13,14 @@ describe("AdminMemberDetail", () => {
           notes: "Prefiere turno manana",
           status: "active",
           profileId: "profile-1",
+          createdAt: new Date("2026-04-01T12:00:00Z"),
+          updatedAt: new Date("2026-04-02T12:00:00Z"),
+          deleteSummary: {
+            canDelete: true,
+            bookingCount: 0,
+            planCount: 0,
+            renewalCount: 0,
+          },
           activePlan: {
             memberPlanId: "member-plan-1",
             planId: "plan-1",
@@ -28,6 +36,7 @@ describe("AdminMemberDetail", () => {
           planHistory: [
             {
               id: "member-plan-1",
+              planId: "plan-1",
               planName: "Plan Creator",
               status: "active",
               startsAt: new Date("2026-04-01T12:00:00Z"),
@@ -61,5 +70,49 @@ describe("AdminMemberDetail", () => {
     expect(screen.getByText("Ajuste manual de cupos")).toBeInTheDocument();
     expect(screen.getByText("Cambiar plan")).toBeInTheDocument();
     expect(screen.getByText("Historial reciente de planes")).toBeInTheDocument();
+    expect(screen.getByText("Zona de acciones")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ocultar miembro" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Eliminar miembro" })).toBeInTheDocument();
+  });
+
+  it("shows why a member cannot be deleted when it has history", () => {
+    render(
+      <AdminMemberDetail
+        member={{
+          id: "member-1",
+          fullName: "Ana Perez",
+          email: "ana@example.com",
+          phone: null,
+          notes: null,
+          status: "active",
+          profileId: "profile-1",
+          createdAt: new Date("2026-04-01T12:00:00Z"),
+          updatedAt: new Date("2026-04-02T12:00:00Z"),
+          deleteSummary: {
+            canDelete: false,
+            bookingCount: 2,
+            planCount: 1,
+            renewalCount: 0,
+          },
+          activePlan: {
+            memberPlanId: "member-plan-1",
+            planId: "plan-1",
+            planName: "Plan Creator",
+            status: "active",
+            startsAt: new Date("2026-04-01T12:00:00Z"),
+            endsAt: new Date("2026-05-01T12:00:00Z"),
+            nextPaymentDueAt: new Date("2026-05-01T12:00:00Z"),
+            quotaTotal: 12,
+            quotaUsed: 4,
+            quotaRemaining: 8,
+          },
+          planHistory: [],
+        }}
+        planOptions={[]}
+      />,
+    );
+
+    expect(screen.getByText(/No se puede eliminar mientras conserve historial/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Eliminar miembro" })).not.toBeInTheDocument();
   });
 });
