@@ -1,12 +1,18 @@
 "use server";
 
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { parseStudioDateTimeInput } from "@/lib/datetime";
 import { auditLogs, spaceAvailabilityRules, spaceBlocks, spaces } from "@/lib/db/schema";
+import { canManageSpaces } from "@/lib/permissions/guards";
 import { slugify } from "@/lib/utils";
 import { requireStaffContext } from "@/modules/auth/queries";
+import type { AppRole } from "@/modules/auth/types";
 import { spaceBlockSchema, spaceSchema } from "@/modules/spaces/schema";
+import { buildSpaceWriteValues } from "@/services/spaces/build-space-write-values";
+import { resolveSpaceImageUrl } from "@/services/spaces/resolve-space-image";
 
 function readAvailabilityRules(formData: FormData) {
   return Array.from({ length: 7 }, (_, dayOfWeek) => ({
@@ -17,13 +23,43 @@ function readAvailabilityRules(formData: FormData) {
   }));
 }
 
+function readStringArray(formData: FormData, key: string): string[] {
+  return formData.getAll(key).map(String).filter(Boolean);
+}
+
+
+function revalidateSpacePaths(spaceId?: string) {
+  revalidatePath("/admin/spaces");
+  revalidatePath("/admin/spaces/new");
+
+  if (spaceId) {
+    revalidatePath(`/admin/spaces/${spaceId}`);
+  }
+}
+
+function assertCanManageSpaces(role: AppRole) {
+  if (!canManageSpaces(role)) {
+    redirect("/admin");
+  }
+}
+
 export async function createSpaceAction(formData: FormData) {
   const { profile } = await requireStaffContext();
+  assertCanManageSpaces(profile.role);
+  const name = String(formData.get("name") ?? "");
+  const slug = slugify(name);
+  const imageUrl = await resolveSpaceImageUrl({
+    file: formData.get("imageFile") as File | null,
+    removeImage: false,
+    slug,
+  });
   const input = spaceSchema.parse({
-    name: formData.get("name"),
-    slug: slugify(String(formData.get("name") ?? "")),
+    name,
+    slug,
     description: formData.get("description"),
-    imageUrl: formData.get("imageUrl"),
+    imageUrl: imageUrl ?? "",
+    galleryUrls: readStringArray(formData, "galleryUrls"),
+    videoLinks: readStringArray(formData, "videoLinks"),
     capacity: formData.get("capacity"),
     status: formData.get("status"),
     hourlyQuotaCost: formData.get("hourlyQuotaCost"),
@@ -33,20 +69,11 @@ export async function createSpaceAction(formData: FormData) {
   });
 
   const db = getDb();
+  const values = buildSpaceWriteValues(input);
 
   const [space] = await db
     .insert(spaces)
-    .values({
-      name: input.name,
-      slug: input.slug,
-      description: input.description,
-      imageUrl: input.imageUrl || null,
-      capacity: input.capacity,
-      status: input.status,
-      hourlyQuotaCost: input.hourlyQuotaCost,
-      minBookingHours: input.minBookingHours,
-      maxBookingHours: input.maxBookingHours,
-    })
+    .values(values)
     .returning({ id: spaces.id, name: spaces.name, slug: spaces.slug });
 
   await db.insert(spaceAvailabilityRules).values(
@@ -71,12 +98,86 @@ export async function createSpaceAction(formData: FormData) {
     },
   });
 
-  revalidatePath("/admin/spaces");
-  revalidatePath("/admin/spaces/new");
+  revalidateSpacePaths();
+}
+
+export async function updateSpaceAction(formData: FormData) {
+  const { profile } = await requireStaffContext();
+  assertCanManageSpaces(profile.role);
+  const spaceId = String(formData.get("spaceId") ?? "");
+  const name = String(formData.get("name") ?? "");
+  const slug = slugify(name);
+  const imageUrl = await resolveSpaceImageUrl({
+    currentImageUrl: String(formData.get("currentImageUrl") ?? "").trim() || null,
+    file: formData.get("imageFile") as File | null,
+    removeImage: formData.get("removeImage") === "on",
+    slug,
+  });
+  const input = spaceSchema.parse({
+    name,
+    slug,
+    description: formData.get("description"),
+    imageUrl: imageUrl ?? "",
+    galleryUrls: readStringArray(formData, "galleryUrls"),
+    videoLinks: readStringArray(formData, "videoLinks"),
+    capacity: formData.get("capacity"),
+    status: formData.get("status"),
+    hourlyQuotaCost: formData.get("hourlyQuotaCost"),
+    minBookingHours: formData.get("minBookingHours"),
+    maxBookingHours: formData.get("maxBookingHours"),
+    availabilityRules: readAvailabilityRules(formData),
+  });
+
+  if (!spaceId) {
+    throw new Error("Falta el espacio a actualizar.");
+  }
+
+  const db = getDb();
+  const values = buildSpaceWriteValues(input);
+  const now = new Date();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(spaces)
+      .set({
+        ...values,
+        updatedAt: now,
+      })
+      .where(eq(spaces.id, spaceId));
+
+    await tx.delete(spaceAvailabilityRules).where(eq(spaceAvailabilityRules.spaceId, spaceId));
+
+    await tx.insert(spaceAvailabilityRules).values(
+      input.availabilityRules.map((rule) => ({
+        spaceId,
+        dayOfWeek: rule.dayOfWeek,
+        startTime: rule.startTime,
+        endTime: rule.endTime,
+        isActive: rule.isActive,
+      })),
+    );
+
+    await tx.insert(auditLogs).values({
+      actorId: profile.id,
+      actorRole: profile.role,
+      action: "space.updated",
+      entityType: "space",
+      entityId: spaceId,
+      metadata: {
+        name: values.name,
+        slug: values.slug,
+        status: values.status,
+      },
+    });
+  });
+
+  revalidateSpacePaths(spaceId);
+  redirect(`/admin/spaces/${spaceId}`);
 }
 
 export async function createSpaceBlockAction(formData: FormData) {
   const { profile } = await requireStaffContext();
+  assertCanManageSpaces(profile.role);
   const spaceId = String(formData.get("spaceId") ?? "");
   const input = spaceBlockSchema.parse({
     title: formData.get("title"),
@@ -110,5 +211,34 @@ export async function createSpaceBlockAction(formData: FormData) {
     },
   });
 
-  revalidatePath(`/admin/spaces/${spaceId}`);
+  revalidateSpacePaths(spaceId);
+  redirect(`/admin/spaces/${spaceId}`);
+}
+
+export async function deleteSpaceBlockAction(formData: FormData) {
+  const { profile } = await requireStaffContext();
+  assertCanManageSpaces(profile.role);
+  const spaceId = String(formData.get("spaceId") ?? "");
+  const blockId = String(formData.get("blockId") ?? "");
+
+  if (!spaceId || !blockId) {
+    throw new Error("Falta el bloqueo a eliminar.");
+  }
+
+  const db = getDb();
+  await db.delete(spaceBlocks).where(eq(spaceBlocks.id, blockId));
+
+  await db.insert(auditLogs).values({
+    actorId: profile.id,
+    actorRole: profile.role,
+    action: "space.block_deleted",
+    entityType: "space_block",
+    entityId: blockId,
+    metadata: {
+      spaceId,
+    },
+  });
+
+  revalidateSpacePaths(spaceId);
+  redirect(`/admin/spaces/${spaceId}`);
 }

@@ -1,11 +1,20 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { canManagePlans } from "@/lib/permissions/guards";
+import { requireStaffContext } from "@/modules/auth/queries";
 import { listPlans } from "@/modules/plans/queries";
 
 export default async function PlansPage() {
+  const { profile } = await requireStaffContext();
+
+  if (!canManagePlans(profile.role)) {
+    redirect("/admin");
+  }
+
   const items = await listPlans();
 
   return (
@@ -50,8 +59,12 @@ export default async function PlansPage() {
                   <TableRow key={plan.id}>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{plan.name}</p>
-                        <p className="text-xs text-muted-foreground">{plan.description ?? "Sin descripción"}</p>
+                        <Link href={`/admin/plans/${plan.id}`} className="font-medium hover:underline">
+                          {plan.name}
+                        </Link>
+                        <p className="text-xs text-muted-foreground">
+                          {plan.description ?? "Sin descripción"}
+                        </p>
                       </div>
                     </TableCell>
                     <TableCell>{plan.status}</TableCell>

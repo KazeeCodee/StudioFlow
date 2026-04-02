@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatStudioDateTimeInputValue,
   getStudioDateTimeParts,
   parseStudioDateTimeInput,
 } from "@/lib/datetime";
@@ -25,5 +26,13 @@ describe("getStudioDateTimeParts", () => {
       second: 0,
       dayOfWeek: 3,
     });
+  });
+});
+
+describe("formatStudioDateTimeInputValue", () => {
+  it("serializa una fecha al formato datetime-local del estudio", () => {
+    const result = formatStudioDateTimeInputValue(new Date("2026-04-01T13:00:00.000Z"));
+
+    expect(result).toBe("2026-04-01T10:00");
   });
 });

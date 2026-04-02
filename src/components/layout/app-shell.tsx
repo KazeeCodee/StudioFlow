@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 import { Film, Sparkles } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageHeader } from "@/components/layout/page-header";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { Topbar } from "@/components/layout/topbar";
-import { Separator } from "@/components/ui/separator";
 import type { AppRole } from "@/modules/auth/types";
 
 type AppShellProps = {
@@ -19,6 +21,15 @@ type AppShellProps = {
   statusLabel?: string;
 };
 
+function getUserInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
 export function AppShell({
   children,
   title,
@@ -31,47 +42,62 @@ export function AppShell({
   const isMember = role === "member";
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.14),_transparent_28%),linear-gradient(180deg,_rgba(24,24,27,0.03),_transparent_26%),var(--background)] text-foreground">
-      <div className="mx-auto grid min-h-screen w-full max-w-[1600px] gap-8 px-4 py-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:px-6">
-        <aside className="rounded-[28px] border border-border/70 bg-background/90 p-4 shadow-sm backdrop-blur">
-          <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-card px-4 py-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-foreground text-background">
-                {isMember ? <Sparkles className="h-5 w-5" /> : <Film className="h-5 w-5" />}
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                  StudioFlow
-                </p>
-                <p className="text-sm font-semibold">
-                  {isMember ? "Portal del miembro" : "Centro operativo"}
-                </p>
-              </div>
-            </div>
+    <div className="flex min-h-screen bg-background">
+      {/* ── Sidebar ────────────────────────────────────────────────────────── */}
+      <aside className="hidden w-[260px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
+        {/* Brand header */}
+        <div className="flex items-center gap-3 px-5 py-5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/30">
+            {isMember ? (
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Film className="h-4 w-4" aria-hidden="true" />
+            )}
           </div>
-
-          <div className="mt-6">
-            <SidebarNav role={role} />
-          </div>
-
-          <Separator className="my-6" />
-
-          <div className="space-y-3 rounded-2xl border border-border/70 bg-card/80 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {isMember ? "Tu acceso" : "Estado del estudio"}
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
+              StudioFlow
             </p>
-            <p className="text-sm leading-6 text-muted-foreground">
-              {isMember
-                ? "Entrá directo a tus reservas, tu plan y tus próximos controles desde este menú."
-                : "Detectá renovaciones, agenda activa y miembros a seguir sin salir del panel."}
+            <p className="text-[11px] text-muted-foreground">
+              {isMember ? "Portal del miembro" : "Centro operativo"}
             </p>
           </div>
-        </aside>
+        </div>
 
-        <div className="rounded-[32px] border border-border/70 bg-background/90 p-5 shadow-sm backdrop-blur lg:p-7">
-          <Topbar role={role} user={user} />
+        <Separator className="opacity-50" />
 
-          <div className="mt-8 space-y-8">
+        {/* Navigation */}
+        <div className="flex-1 overflow-y-auto px-3 py-4">
+          <SidebarNav role={role} />
+        </div>
+
+        <Separator className="opacity-50" />
+
+        {/* User footer */}
+        <div className="flex items-center gap-2.5 p-3">
+          <Avatar className="h-8 w-8 shrink-0 border border-border/60">
+            <AvatarFallback className="bg-primary/15 text-xs font-bold text-primary">
+              {getUserInitials(user.name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold text-foreground leading-none">
+              {user.name}
+            </p>
+            <p className="mt-1 truncate text-[10px] text-muted-foreground leading-none">
+              {user.email}
+            </p>
+          </div>
+          <ThemeToggle className="shrink-0 text-muted-foreground" />
+        </div>
+      </aside>
+
+      {/* ── Main area ──────────────────────────────────────────────────────── */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Topbar role={role} user={user} />
+
+        <main className="flex-1">
+          <div className="mx-auto max-w-[1400px] space-y-8 px-4 py-7 lg:px-8">
             <PageHeader
               title={title}
               subtitle={subtitle}
@@ -79,9 +105,9 @@ export function AppShell({
               statusLabel={statusLabel}
             />
 
-            <div>{children}</div>
+            <div className="animate-entrance">{children}</div>
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );

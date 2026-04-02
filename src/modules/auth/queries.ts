@@ -62,6 +62,12 @@ export async function requireAuthenticatedContext() {
     redirect("/login");
   }
 
+  if (context.profile.status !== "active") {
+    const supabase = await createSupabaseServerClient();
+    await supabase.auth.signOut({ scope: "local" });
+    redirect("/login?error=account_inactive");
+  }
+
   return context;
 }
 

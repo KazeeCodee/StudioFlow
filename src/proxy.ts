@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { updateSession } from "@/lib/supabase/proxy";
 
 const protectedPrefixes = ["/admin", "/member"];
 
@@ -18,7 +19,7 @@ function hasSupabaseSessionCookie(request: NextRequest) {
     );
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   if (!isProtectedPath(pathname)) {
@@ -26,7 +27,7 @@ export function proxy(request: NextRequest) {
   }
 
   if (hasSupabaseSessionCookie(request)) {
-    return NextResponse.next();
+    return updateSession(request);
   }
 
   const loginUrl = new URL("/login", request.url);

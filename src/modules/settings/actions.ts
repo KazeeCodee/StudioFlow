@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { auditLogs, systemSettings } from "@/lib/db/schema";
 import { canManageSettings } from "@/lib/permissions/guards";
@@ -11,6 +12,10 @@ import {
   operationalSettingsKey,
 } from "@/modules/settings/queries";
 import { operationalSettingsSchema } from "@/modules/settings/schema";
+import {
+  sendDailyReminderNotifications,
+  sendSystemTestNotification,
+} from "@/services/notifications/dispatcher";
 
 export async function updateOperationalSettingsAction(formData: FormData) {
   const { profile } = await requireStaffContext();
@@ -66,4 +71,59 @@ export async function updateOperationalSettingsAction(formData: FormData) {
   revalidatePath("/admin/bookings/new");
   revalidatePath("/member/bookings/new");
   redirect("/admin/settings");
+}
+
+const testNotificationSchema = z.object({
+  recipientEmail: z.email("Ingresa un email valido."),
+});
+
+export async function sendTestNotificationAction(formData: FormData) {
+  const { profile } = await requireStaffContext();
+
+  if (!canManageSettings(profile.role)) {
+    redirect("/admin");
+  }
+
+  const input = testNotificationSchema.parse({
+    recipientEmail: formData.get("recipientEmail"),
+  });
+
+  const result = await sendSystemTestNotification({
+    recipientEmail: input.recipientEmail,
+    recipientName: profile.fullName,
+  });
+
+  revalidatePath("/admin/settings");
+  const params = new URLSearchParams({
+    notificationAction: "test_email",
+    notificationStatus: result.status,
+  });
+
+  if ("reason" in result && result.reason) {
+    params.set("notificationDetail", result.reason);
+  }
+
+  redirect(`/admin/settings?${params.toString()}`);
+}
+
+export async function runDailyNotificationsNowAction() {
+  const { profile } = await requireStaffContext();
+
+  if (!canManageSettings(profile.role)) {
+    redirect("/admin");
+  }
+
+  const result = await sendDailyReminderNotifications();
+
+  revalidatePath("/admin/settings");
+  const params = new URLSearchParams({
+    notificationAction: "daily_run",
+    notificationStatus: result.failed > 0 ? "partial" : "ok",
+    attempted: String(result.attempted),
+    sent: String(result.sent),
+    skipped: String(result.skipped),
+    failed: String(result.failed),
+  });
+
+  redirect(`/admin/settings?${params.toString()}`);
 }

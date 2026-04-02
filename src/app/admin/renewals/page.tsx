@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { formatStudioDate } from "@/lib/datetime";
 import { renewMemberPlanAction } from "@/modules/renewals/actions";
 import { listRenewalAlerts, listRecentRenewals } from "@/modules/alerts/queries";
@@ -7,8 +8,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { canRenewPlans } from "@/lib/permissions/guards";
+import { requireStaffContext } from "@/modules/auth/queries";
 
 export default async function RenewalsPage() {
+  const { profile } = await requireStaffContext();
+
+  if (!canRenewPlans(profile.role)) {
+    redirect("/admin");
+  }
+
   const [candidates, alerts, recentRenewals] = await Promise.all([
     listRenewalCandidates(),
     listRenewalAlerts(),

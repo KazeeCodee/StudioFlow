@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { auditLogs, bookingStatusHistory, bookings, memberPlans } from "@/lib/db/schema";
 import type { AuthenticatedProfile } from "@/modules/auth/types";
 import { getBookingForCancellation } from "@/modules/bookings/queries";
+import { getBookingPenaltyOutcome } from "@/services/bookings/booking-penalty";
 
 export async function cancelBooking(
   {
@@ -24,7 +25,7 @@ export async function cancelBooking(
     actor.role === "member" &&
     (!booking.memberProfileId || booking.memberProfileId !== actor.id)
   ) {
-    throw new Error("No podés cancelar reservas de otro miembro.");
+    throw new Error("No podes cancelar reservas de otro miembro.");
   }
 
   if (
@@ -38,10 +39,10 @@ export async function cancelBooking(
     throw new Error("Solo se pueden cancelar reservas futuras.");
   }
 
-  const hoursUntilStart =
-    (booking.startsAt.getTime() - Date.now()) / 3_600_000;
-  const policyHours = booking.cancellationPolicyHours ?? 24;
-  const shouldRefund = hoursUntilStart >= policyHours;
+  const penalty = getBookingPenaltyOutcome({
+    policyHours: booking.cancellationPolicyHours ?? 24,
+    startsAt: booking.startsAt,
+  });
   const newStatus = actor.role === "member" ? "cancelled_by_user" : "cancelled_by_admin";
 
   const db = getDb();
@@ -58,7 +59,7 @@ export async function cancelBooking(
       })
       .where(eq(bookings.id, booking.id));
 
-    if (shouldRefund && booking.memberPlanId) {
+    if (penalty.shouldRefund && booking.memberPlanId) {
       await tx
         .update(memberPlans)
         .set({
@@ -75,9 +76,9 @@ export async function cancelBooking(
       oldStatus: booking.status,
       newStatus,
       changedBy: actor.id,
-      note: shouldRefund
+      note: penalty.shouldRefund
         ? "Reserva cancelada con reintegro de cupos"
-        : "Reserva cancelada sin reintegro por política",
+        : "Reserva cancelada sin reintegro por politica",
     });
 
     await tx.insert(auditLogs).values({
@@ -87,7 +88,7 @@ export async function cancelBooking(
       entityType: "booking",
       entityId: booking.id,
       metadata: {
-        refundedQuota: shouldRefund,
+        refundedQuota: penalty.shouldRefund,
         quotaConsumed: booking.quotaConsumed,
       },
     });
@@ -95,7 +96,7 @@ export async function cancelBooking(
     return {
       bookingId: booking.id,
       status: newStatus,
-      refundedQuota: shouldRefund,
+      refundedQuota: penalty.shouldRefund,
     };
   });
 }

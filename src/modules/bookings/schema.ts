@@ -18,5 +18,19 @@ export const cancellationSchema = z.object({
   redirectTo: z.string().optional(),
 });
 
+export const rescheduleSchema = z
+  .object({
+    bookingId: z.string().uuid(),
+    startsAt: z.string().min(1, "La nueva fecha y hora de inicio es obligatoria."),
+    endsAt: z.string().min(1, "La nueva fecha y hora de fin es obligatoria."),
+    reason: z.string().trim().optional(),
+    redirectTo: z.string().optional(),
+  })
+  .refine((input) => input.startsAt < input.endsAt, {
+    path: ["endsAt"],
+    message: "El fin debe ser posterior al inicio.",
+  });
+
 export type BookingInput = z.infer<typeof bookingSchema>;
 export type CancellationInput = z.infer<typeof cancellationSchema>;
+export type RescheduleInput = z.infer<typeof rescheduleSchema>;

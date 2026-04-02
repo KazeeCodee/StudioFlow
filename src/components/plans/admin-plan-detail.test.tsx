@@ -1,0 +1,31 @@
+import { render, screen } from "@testing-library/react";
+import { AdminPlanDetail } from "@/components/plans/admin-plan-detail";
+
+describe("AdminPlanDetail", () => {
+  it("renders summary, rules form and status management", () => {
+    render(
+      <AdminPlanDetail
+        plan={{
+          id: "plan-1",
+          name: "Plan Pro",
+          description: "Incluye prioridad",
+          status: "active",
+          durationType: "monthly",
+          durationValue: 1,
+          quotaAmount: 20,
+          price: "12500.00",
+          cancellationPolicyHours: 24,
+          maxBookingsPerDay: 2,
+          maxBookingsPerWeek: 5,
+          createdAt: new Date("2026-04-01T12:00:00Z"),
+          updatedAt: new Date("2026-04-02T12:00:00Z"),
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Editar reglas del plan")).toBeInTheDocument();
+    expect(screen.getByText("Estado del plan")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Plan Pro")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("active")).toBeInTheDocument();
+  });
+});

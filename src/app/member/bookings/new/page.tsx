@@ -1,20 +1,25 @@
-import { BookingForm } from "@/components/forms/booking-form";
-import { listBookingSpaceOptions } from "@/modules/bookings/queries";
+import { listSmartBookingSpaceOptions } from "@/modules/bookings/queries";
+import { SmartBookingForm } from "@/components/forms/smart-booking-form";
 
-export default async function NewMemberBookingPage() {
-  const spaceOptions = await listBookingSpaceOptions();
+type PageProps = {
+  searchParams: Promise<{ spaceId?: string }>;
+};
+
+export default async function NewMemberBookingPage({ searchParams }: PageProps) {
+  const { spaceId } = await searchParams;
+  const spaceOptions = await listSmartBookingSpaceOptions();
 
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Reservar</p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight">Nueva reserva</h2>
+        <p className="text-xs uppercase tracking-[0.24em] text-primary font-semibold">Reservar</p>
+        <h2 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Nueva reserva</h2>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Elegí un espacio y un horario. El sistema valida automáticamente disponibilidad real y cupos antes de confirmar.
+          Elegí un espacio y la fecha. El sistema valida automáticamente disponibilidad real y cupos antes de confirmar.
         </p>
       </div>
 
-      <BookingForm role="member" spaceOptions={spaceOptions} />
+      <SmartBookingForm spaceOptions={spaceOptions} preselectedSpaceId={spaceId} />
     </div>
   );
 }

@@ -5,17 +5,54 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-export function PlanForm() {
+type PlanFormValues = {
+  name?: string;
+  description?: string | null;
+  status?: "draft" | "active" | "inactive" | "archived";
+  durationType?: "weekly" | "monthly" | "custom";
+  durationValue?: number;
+  quotaAmount?: number;
+  price?: string | null;
+  cancellationPolicyHours?: number;
+  maxBookingsPerDay?: number | null;
+  maxBookingsPerWeek?: number | null;
+};
+
+type PlanFormProps = {
+  action?: (formData: FormData) => void | Promise<void>;
+  title?: string;
+  submitLabel?: string;
+  defaultValues?: PlanFormValues;
+  showStatusField?: boolean;
+  children?: React.ReactNode;
+};
+
+export function PlanForm({
+  action = createPlanAction,
+  title = "Crear plan",
+  submitLabel = "Guardar plan",
+  defaultValues,
+  showStatusField = true,
+  children,
+}: PlanFormProps) {
   return (
     <Card className="rounded-[28px] border-border/70">
       <CardHeader>
-        <CardTitle>Crear plan</CardTitle>
+        <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <form action={createPlanAction} className="grid gap-5 md:grid-cols-2">
+        <form action={action} className="grid gap-5 md:grid-cols-2">
+          {children}
+
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="name">Nombre</Label>
-            <Input id="name" name="name" placeholder="Plan Producción" required />
+            <Input
+              id="name"
+              name="name"
+              placeholder="Plan Producción"
+              defaultValue={defaultValues?.name ?? ""}
+              required
+            />
           </div>
 
           <div className="space-y-2 md:col-span-2">
@@ -24,23 +61,26 @@ export function PlanForm() {
               id="description"
               name="description"
               placeholder="Incluye horas mensuales y prioridad de agenda."
+              defaultValue={defaultValues?.description ?? ""}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="status">Estado</Label>
-            <select
-              id="status"
-              name="status"
-              className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-              defaultValue="draft"
-            >
-              <option value="draft">Borrador</option>
-              <option value="active">Activo</option>
-              <option value="inactive">Inactivo</option>
-              <option value="archived">Archivado</option>
-            </select>
-          </div>
+          {showStatusField ? (
+            <div className="space-y-2">
+              <Label htmlFor="status">Estado</Label>
+              <select
+                id="status"
+                name="status"
+                className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
+                defaultValue={defaultValues?.status ?? "draft"}
+              >
+                <option value="draft">Borrador</option>
+                <option value="active">Activo</option>
+                <option value="inactive">Inactivo</option>
+                <option value="archived">Archivado</option>
+              </select>
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label htmlFor="durationType">Tipo de vigencia</Label>
@@ -48,7 +88,7 @@ export function PlanForm() {
               id="durationType"
               name="durationType"
               className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-              defaultValue="monthly"
+              defaultValue={defaultValues?.durationType ?? "monthly"}
             >
               <option value="monthly">Mensual</option>
               <option value="weekly">Semanal</option>
@@ -58,17 +98,39 @@ export function PlanForm() {
 
           <div className="space-y-2">
             <Label htmlFor="durationValue">Duración</Label>
-            <Input id="durationValue" name="durationValue" type="number" min={1} defaultValue={1} required />
+            <Input
+              id="durationValue"
+              name="durationValue"
+              type="number"
+              min={1}
+              defaultValue={defaultValues?.durationValue ?? 1}
+              required
+            />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="quotaAmount">Cupos</Label>
-            <Input id="quotaAmount" name="quotaAmount" type="number" min={1} defaultValue={12} required />
+            <Input
+              id="quotaAmount"
+              name="quotaAmount"
+              type="number"
+              min={1}
+              defaultValue={defaultValues?.quotaAmount ?? 12}
+              required
+            />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="price">Precio de referencia</Label>
-            <Input id="price" name="price" type="number" min={0} step="0.01" placeholder="0.00" />
+            <Input
+              id="price"
+              name="price"
+              type="number"
+              min={0}
+              step="0.01"
+              placeholder="0.00"
+              defaultValue={defaultValues?.price ?? ""}
+            />
           </div>
 
           <div className="space-y-2">
@@ -78,23 +140,37 @@ export function PlanForm() {
               name="cancellationPolicyHours"
               type="number"
               min={0}
-              defaultValue={24}
+              defaultValue={defaultValues?.cancellationPolicyHours ?? 24}
               required
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="maxBookingsPerDay">Límite por día</Label>
-            <Input id="maxBookingsPerDay" name="maxBookingsPerDay" type="number" min={1} placeholder="Opcional" />
+            <Input
+              id="maxBookingsPerDay"
+              name="maxBookingsPerDay"
+              type="number"
+              min={1}
+              placeholder="Opcional"
+              defaultValue={defaultValues?.maxBookingsPerDay ?? ""}
+            />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="maxBookingsPerWeek">Límite por semana</Label>
-            <Input id="maxBookingsPerWeek" name="maxBookingsPerWeek" type="number" min={1} placeholder="Opcional" />
+            <Input
+              id="maxBookingsPerWeek"
+              name="maxBookingsPerWeek"
+              type="number"
+              min={1}
+              placeholder="Opcional"
+              defaultValue={defaultValues?.maxBookingsPerWeek ?? ""}
+            />
           </div>
 
           <div className="md:col-span-2">
-            <Button type="submit">Guardar plan</Button>
+            <Button type="submit">{submitLabel}</Button>
           </div>
         </form>
       </CardContent>

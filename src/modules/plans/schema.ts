@@ -19,4 +19,10 @@ export const planSchema = z.object({
     .transform((value) => (value === "" ? null : value)),
 });
 
+export const planStatusUpdateSchema = z.object({
+  status: z.enum(["draft", "active", "inactive", "archived"]),
+  reason: z.string().trim().optional(),
+});
+
 export type PlanInput = z.infer<typeof planSchema>;
+export type PlanStatusUpdateInput = z.infer<typeof planStatusUpdateSchema>;

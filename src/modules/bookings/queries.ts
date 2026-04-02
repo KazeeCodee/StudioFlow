@@ -1,16 +1,109 @@
-import { and, desc, eq, gt, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lt, ne } from "drizzle-orm";
+import { notFound } from "next/navigation";
+import { formatStudioDateTime } from "@/lib/datetime";
 import { getDb } from "@/lib/db";
 import {
+  auditLogs,
+  bookingStatusHistory,
   bookings,
   memberPlans,
   members,
   plans,
+  profiles,
   spaceAvailabilityRules,
   spaceBlocks,
   spaces,
 } from "@/lib/db/schema";
 
 const activeBookingStatuses = ["pending", "confirmed"] as const;
+
+function formatStatusLabel(status: string) {
+  switch (status) {
+    case "pending":
+      return "Reserva pendiente";
+    case "confirmed":
+      return "Reserva confirmada";
+    case "cancelled_by_user":
+      return "Reserva cancelada por el miembro";
+    case "cancelled_by_admin":
+      return "Reserva cancelada por staff";
+    case "completed":
+      return "Reserva completada";
+    case "no_show":
+      return "Reserva marcada como no show";
+    default:
+      return `Estado ${status}`;
+  }
+}
+
+function formatAuditLabel(action: string) {
+  switch (action) {
+    case "booking.created":
+      return "Reserva creada";
+    case "booking.cancelled":
+      return "Reserva cancelada";
+    case "booking.rescheduled":
+      return "Reserva reprogramada";
+    default:
+      return action;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function asDate(value: unknown) {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function buildAuditDescription(action: string, metadata: unknown) {
+  if (!isRecord(metadata)) {
+    return null;
+  }
+
+  if (action === "booking.rescheduled") {
+    const previousStartsAt = asDate(metadata.previousStartsAt);
+    const nextStartsAt = asDate(metadata.nextStartsAt);
+    const refundedQuota = metadata.refundedQuota === true;
+
+    if (previousStartsAt && nextStartsAt) {
+      return `${formatStudioDateTime(previousStartsAt)} -> ${formatStudioDateTime(nextStartsAt)}${refundedQuota ? " con reintegro previo." : " sin reintegro por politica."}`;
+    }
+  }
+
+  if (action === "booking.cancelled") {
+    if (metadata.refundedQuota === true) {
+      return "La cancelacion devolvio los cupos consumidos segun la politica del plan.";
+    }
+
+    if (metadata.refundedQuota === false) {
+      return "La cancelacion mantuvo los cupos consumidos por estar fuera de politica.";
+    }
+  }
+
+  if (action === "booking.created" && typeof metadata.quotaConsumed === "number") {
+    return `La reserva consumio ${metadata.quotaConsumed} cupo(s).`;
+  }
+
+  if (typeof metadata.reason === "string" && metadata.reason.trim().length > 0) {
+    return metadata.reason;
+  }
+
+  return null;
+}
 
 export async function listBookingSpaceOptions() {
   const db = getDb();
@@ -24,6 +117,30 @@ export async function listBookingSpaceOptions() {
     .from(spaces)
     .where(eq(spaces.status, "active"))
     .orderBy(spaces.name);
+}
+
+export async function listSmartBookingSpaceOptions() {
+  const db = getDb();
+
+  const spacesList = await db
+    .select({
+      id: spaces.id,
+      name: spaces.name,
+      hourlyQuotaCost: spaces.hourlyQuotaCost,
+      minBookingHours: spaces.minBookingHours,
+      maxBookingHours: spaces.maxBookingHours,
+      imageUrl: spaces.imageUrl,
+    })
+    .from(spaces)
+    .where(eq(spaces.status, "active"))
+    .orderBy(spaces.name);
+
+  const rules = await db.select().from(spaceAvailabilityRules);
+
+  return spacesList.map((space) => ({
+    ...space,
+    availabilityRules: rules.filter((r) => r.spaceId === space.id),
+  }));
 }
 
 export async function listBookingMemberOptions() {
@@ -96,6 +213,10 @@ export async function getSpaceBookingContext(spaceId: string) {
       id: spaces.id,
       name: spaces.name,
       status: spaces.status,
+      description: spaces.description,
+      imageUrl: spaces.imageUrl,
+      galleryUrls: spaces.galleryUrls,
+      videoLinks: spaces.videoLinks,
       hourlyQuotaCost: spaces.hourlyQuotaCost,
       minBookingHours: spaces.minBookingHours,
       maxBookingHours: spaces.maxBookingHours,
@@ -162,6 +283,38 @@ export async function getOverlappingBookings(spaceId: string, startsAt: Date, en
         inArray(bookings.status, [...activeBookingStatuses]),
         lt(bookings.startsAt, endsAt),
         gt(bookings.endsAt, startsAt),
+      ),
+    );
+}
+
+export async function getOverlappingBookingsExcludingCurrent({
+  endsAt,
+  spaceId,
+  startsAt,
+  bookingId,
+}: {
+  bookingId: string;
+  spaceId: string;
+  startsAt: Date;
+  endsAt: Date;
+}) {
+  const db = getDb();
+
+  return db
+    .select({
+      id: bookings.id,
+      startsAt: bookings.startsAt,
+      endsAt: bookings.endsAt,
+      status: bookings.status,
+    })
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.spaceId, spaceId),
+        inArray(bookings.status, [...activeBookingStatuses]),
+        lt(bookings.startsAt, endsAt),
+        gt(bookings.endsAt, startsAt),
+        ne(bookings.id, bookingId),
       ),
     );
 }
@@ -311,4 +464,123 @@ export async function getBookingForCancellation(bookingId: string) {
     .limit(1);
 
   return booking ?? null;
+}
+
+export async function getBookingForReschedule(bookingId: string) {
+  const db = getDb();
+
+  const [booking] = await db
+    .select({
+      id: bookings.id,
+      memberId: bookings.memberId,
+      memberPlanId: bookings.memberPlanId,
+      memberProfileId: members.profileId,
+      spaceId: bookings.spaceId,
+      startsAt: bookings.startsAt,
+      endsAt: bookings.endsAt,
+      durationHours: bookings.durationHours,
+      status: bookings.status,
+      quotaConsumed: bookings.quotaConsumed,
+      memberPlanQuotaRemaining: memberPlans.quotaRemaining,
+      memberPlanQuotaUsed: memberPlans.quotaUsed,
+      cancellationPolicyHours: plans.cancellationPolicyHours,
+    })
+    .from(bookings)
+    .innerJoin(members, eq(members.id, bookings.memberId))
+    .leftJoin(memberPlans, eq(memberPlans.id, bookings.memberPlanId))
+    .leftJoin(plans, eq(plans.id, memberPlans.planId))
+    .where(eq(bookings.id, bookingId))
+    .limit(1);
+
+  return booking ?? null;
+}
+
+export async function getBookingDetail(bookingId: string) {
+  const db = getDb();
+
+  const [booking] = await db
+    .select({
+      id: bookings.id,
+      memberId: bookings.memberId,
+      memberProfileId: members.profileId,
+      status: bookings.status,
+      startsAt: bookings.startsAt,
+      endsAt: bookings.endsAt,
+      durationHours: bookings.durationHours,
+      quotaConsumed: bookings.quotaConsumed,
+      cancellationReason: bookings.cancellationReason,
+      cancelledAt: bookings.cancelledAt,
+      memberName: members.fullName,
+      memberEmail: members.email,
+      spaceName: spaces.name,
+      createdAt: bookings.createdAt,
+      updatedAt: bookings.updatedAt,
+      cancellationPolicyHours: plans.cancellationPolicyHours,
+    })
+    .from(bookings)
+    .innerJoin(members, eq(members.id, bookings.memberId))
+    .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
+    .leftJoin(memberPlans, eq(memberPlans.id, bookings.memberPlanId))
+    .leftJoin(plans, eq(plans.id, memberPlans.planId))
+    .where(eq(bookings.id, bookingId))
+    .limit(1);
+
+  if (!booking) {
+    notFound();
+  }
+
+  const [statusEntries, auditEntries] = await Promise.all([
+    db
+      .select({
+        id: bookingStatusHistory.id,
+        createdAt: bookingStatusHistory.changedAt,
+        actorName: profiles.fullName,
+        oldStatus: bookingStatusHistory.oldStatus,
+        newStatus: bookingStatusHistory.newStatus,
+        note: bookingStatusHistory.note,
+      })
+      .from(bookingStatusHistory)
+      .leftJoin(profiles, eq(profiles.id, bookingStatusHistory.changedBy))
+      .where(eq(bookingStatusHistory.bookingId, booking.id))
+      .orderBy(desc(bookingStatusHistory.changedAt)),
+    db
+      .select({
+        id: auditLogs.id,
+        createdAt: auditLogs.createdAt,
+        actorName: profiles.fullName,
+        action: auditLogs.action,
+        metadata: auditLogs.metadata,
+      })
+      .from(auditLogs)
+      .leftJoin(profiles, eq(profiles.id, auditLogs.actorId))
+      .where(and(eq(auditLogs.entityType, "booking"), eq(auditLogs.entityId, booking.id)))
+      .orderBy(desc(auditLogs.createdAt)),
+  ]);
+
+  const timeline = [
+    ...statusEntries.map((entry) => ({
+      id: entry.id,
+      kind: "status" as const,
+      createdAt: entry.createdAt,
+      actorName: entry.actorName,
+      label: entry.note?.trim() || formatStatusLabel(entry.newStatus),
+      description:
+        entry.oldStatus && entry.oldStatus !== entry.newStatus
+          ? `${formatStatusLabel(entry.oldStatus)} -> ${formatStatusLabel(entry.newStatus)}`
+          : null,
+    })),
+    ...auditEntries.map((entry) => ({
+      id: entry.id,
+      kind: "audit" as const,
+      createdAt: entry.createdAt,
+      actorName: entry.actorName,
+      label: formatAuditLabel(entry.action),
+      description: buildAuditDescription(entry.action, entry.metadata),
+    })),
+  ].sort((first, second) => second.createdAt.getTime() - first.createdAt.getTime());
+
+  return {
+    ...booking,
+    timeline,
+  };
 }

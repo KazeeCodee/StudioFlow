@@ -19,6 +19,6 @@ describe("AppShell", () => {
 
     expect(screen.getByText("Contenido")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Principal" })).toBeInTheDocument();
-    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+    expect(screen.getAllByText("Ada Lovelace")).toHaveLength(2);
   });
 });

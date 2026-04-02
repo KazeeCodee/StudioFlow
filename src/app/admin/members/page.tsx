@@ -1,12 +1,21 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
 import { formatStudioDate } from "@/lib/datetime";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { canManageMembers } from "@/lib/permissions/guards";
+import { requireStaffContext } from "@/modules/auth/queries";
 import { listMembers } from "@/modules/members/queries";
 
 export default async function MembersPage() {
+  const { profile } = await requireStaffContext();
+
+  if (!canManageMembers(profile.role)) {
+    redirect("/admin");
+  }
+
   const items = await listMembers();
 
   return (
@@ -51,7 +60,9 @@ export default async function MembersPage() {
                   <TableRow key={member.id}>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{member.fullName}</p>
+                        <Link href={`/admin/members/${member.id}`} className="font-medium hover:underline">
+                          {member.fullName}
+                        </Link>
                         <p className="text-xs text-muted-foreground">{member.email}</p>
                       </div>
                     </TableCell>

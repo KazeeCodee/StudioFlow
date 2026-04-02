@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAuthenticatedContext, requireMemberContext, requireStaffContext } from "@/modules/auth/queries";
-import { bookingSchema, cancellationSchema } from "@/modules/bookings/schema";
+import { bookingSchema, cancellationSchema, rescheduleSchema } from "@/modules/bookings/schema";
 import { cancelBooking } from "@/services/bookings/cancel-booking";
 import { createBooking } from "@/services/bookings/create-booking";
+import { rescheduleBooking } from "@/services/bookings/reschedule-booking";
 import {
   sendBookingCancelledNotifications,
   sendBookingCreatedNotifications,
+  sendBookingRescheduledNotifications,
 } from "@/services/notifications/dispatcher";
 
 async function notifySafely(task: () => Promise<void>) {
@@ -70,6 +72,40 @@ export async function cancelBookingAction(formData: FormData) {
   await notifySafely(() => sendBookingCancelledNotifications(cancellation.bookingId));
 
   const redirectTo = input.redirectTo || (profile.role === "member" ? "/member/bookings" : "/admin/bookings");
+  revalidatePath("/admin/bookings");
+  revalidatePath("/member/bookings");
+  revalidatePath(`/admin/bookings/${cancellation.bookingId}`);
+  revalidatePath(`/member/bookings/${cancellation.bookingId}`);
+  revalidatePath(redirectTo);
+  redirect(redirectTo);
+}
+
+export async function rescheduleBookingAction(formData: FormData) {
+  const { profile } = await requireAuthenticatedContext();
+  const input = rescheduleSchema.parse({
+    bookingId: formData.get("bookingId"),
+    startsAt: formData.get("startsAt"),
+    endsAt: formData.get("endsAt"),
+    reason: formData.get("reason"),
+    redirectTo: formData.get("redirectTo"),
+  });
+
+  const result = await rescheduleBooking(
+    {
+      bookingId: input.bookingId,
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+      reason: input.reason,
+    },
+    profile,
+  );
+  await notifySafely(() => sendBookingRescheduledNotifications(result.bookingId));
+
+  const redirectTo = input.redirectTo || (profile.role === "member" ? "/member/bookings" : "/admin/bookings");
+  revalidatePath("/admin/bookings");
+  revalidatePath("/member/bookings");
+  revalidatePath(`/admin/bookings/${result.bookingId}`);
+  revalidatePath(`/member/bookings/${result.bookingId}`);
   revalidatePath(redirectTo);
   redirect(redirectTo);
 }

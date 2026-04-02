@@ -33,6 +33,21 @@ export const spaceSchema = z
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Usá minúsculas y guiones."),
     description: z.string().trim().optional(),
     imageUrl: z.string().url().optional().or(z.literal("")),
+    galleryUrls: z.array(z.string().url("Cada URL de galería debe ser válida.")).default([]),
+    videoLinks: z
+      .array(
+        z
+          .string()
+          .url("El link de YouTube debe ser una URL válida.")
+          .refine(
+            (url) =>
+              url.includes("youtube.com/watch") ||
+              url.includes("youtu.be/") ||
+              url.includes("youtube.com/shorts"),
+            "Solo se permiten links de YouTube (youtube.com o youtu.be).",
+          ),
+      )
+      .default([]),
     capacity: z
       .preprocess(
         (value) => (value === undefined || value === null ? "" : value),
@@ -64,3 +79,22 @@ export const spaceBlockSchema = z
 
 export type SpaceInput = z.infer<typeof spaceSchema>;
 export type SpaceBlockInput = z.infer<typeof spaceBlockSchema>;
+
+/** Extracts a YouTube video ID from various YouTube URL formats */
+export function extractYoutubeId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes("youtu.be")) {
+      return parsed.pathname.slice(1) || null;
+    }
+    if (parsed.hostname.includes("youtube.com")) {
+      if (parsed.pathname.startsWith("/shorts/")) {
+        return parsed.pathname.split("/shorts/")[1]?.split("/")[0] || null;
+      }
+      return parsed.searchParams.get("v");
+    }
+  } catch {
+    // invalid URL
+  }
+  return null;
+}

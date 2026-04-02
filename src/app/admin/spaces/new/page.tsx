@@ -1,6 +1,15 @@
+import { redirect } from "next/navigation";
 import { SpaceForm } from "@/components/forms/space-form";
+import { canManageSpaces } from "@/lib/permissions/guards";
+import { requireStaffContext } from "@/modules/auth/queries";
 
-export default function NewSpacePage() {
+export default async function NewSpacePage() {
+  const { profile } = await requireStaffContext();
+
+  if (!canManageSpaces(profile.role)) {
+    redirect("/admin");
+  }
+
   return (
     <div className="space-y-6">
       <div>

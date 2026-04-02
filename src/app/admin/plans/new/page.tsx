@@ -1,6 +1,15 @@
+import { redirect } from "next/navigation";
 import { PlanForm } from "@/components/forms/plan-form";
+import { canManagePlans } from "@/lib/permissions/guards";
+import { requireStaffContext } from "@/modules/auth/queries";
 
-export default function NewPlanPage() {
+export default async function NewPlanPage() {
+  const { profile } = await requireStaffContext();
+
+  if (!canManagePlans(profile.role)) {
+    redirect("/admin");
+  }
+
   return (
     <div className="space-y-6">
       <div>

@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { spaceAvailabilityRules, spaceBlocks, spaces } from "@/lib/db/schema";
@@ -11,7 +11,11 @@ export async function listSpaces() {
       id: spaces.id,
       name: spaces.name,
       slug: spaces.slug,
+      description: spaces.description,
       status: spaces.status,
+      imageUrl: spaces.imageUrl,
+      galleryUrls: spaces.galleryUrls,
+      videoLinks: spaces.videoLinks,
       hourlyQuotaCost: spaces.hourlyQuotaCost,
       minBookingHours: spaces.minBookingHours,
       maxBookingHours: spaces.maxBookingHours,
@@ -21,6 +25,32 @@ export async function listSpaces() {
     .from(spaces)
     .orderBy(desc(spaces.createdAt));
 }
+
+/** Public-facing list of spaces for the member portal — only active spaces */
+export async function listPublicSpaces() {
+  const db = getDb();
+
+  return db
+    .select({
+      id: spaces.id,
+      name: spaces.name,
+      slug: spaces.slug,
+      description: spaces.description,
+      status: spaces.status,
+      imageUrl: spaces.imageUrl,
+      galleryUrls: spaces.galleryUrls,
+      videoLinks: spaces.videoLinks,
+      hourlyQuotaCost: spaces.hourlyQuotaCost,
+      minBookingHours: spaces.minBookingHours,
+      maxBookingHours: spaces.maxBookingHours,
+      capacity: spaces.capacity,
+      createdAt: spaces.createdAt,
+    })
+    .from(spaces)
+    .where(eq(spaces.status, "active"))
+    .orderBy(spaces.name);
+}
+
 
 export async function getSpaceDetail(spaceId: string) {
   const db = getDb();
@@ -32,6 +62,8 @@ export async function getSpaceDetail(spaceId: string) {
       slug: spaces.slug,
       description: spaces.description,
       imageUrl: spaces.imageUrl,
+      galleryUrls: spaces.galleryUrls,
+      videoLinks: spaces.videoLinks,
       capacity: spaces.capacity,
       status: spaces.status,
       hourlyQuotaCost: spaces.hourlyQuotaCost,
@@ -57,7 +89,8 @@ export async function getSpaceDetail(spaceId: string) {
       isActive: spaceAvailabilityRules.isActive,
     })
     .from(spaceAvailabilityRules)
-    .where(eq(spaceAvailabilityRules.spaceId, space.id));
+    .where(eq(spaceAvailabilityRules.spaceId, space.id))
+    .orderBy(asc(spaceAvailabilityRules.dayOfWeek));
 
   const blocks = await db
     .select({
@@ -76,6 +109,59 @@ export async function getSpaceDetail(spaceId: string) {
     ...space,
     availability,
     blocks,
+  };
+}
+
+/**
+ * Like getSpaceDetail but returns notFound() if the space is not active.
+ * Used by the member portal — members should only see active spaces.
+ */
+export async function getPublicSpaceDetail(spaceId: string) {
+  const db = getDb();
+
+  const [space] = await db
+    .select({
+      id: spaces.id,
+      name: spaces.name,
+      slug: spaces.slug,
+      description: spaces.description,
+      imageUrl: spaces.imageUrl,
+      galleryUrls: spaces.galleryUrls,
+      videoLinks: spaces.videoLinks,
+      capacity: spaces.capacity,
+      status: spaces.status,
+      hourlyQuotaCost: spaces.hourlyQuotaCost,
+      minBookingHours: spaces.minBookingHours,
+      maxBookingHours: spaces.maxBookingHours,
+    })
+    .from(spaces)
+    .where(and(eq(spaces.id, spaceId), eq(spaces.status, "active")))
+    .limit(1);
+
+  if (!space) {
+    notFound();
+  }
+
+  const availability = await db
+    .select({
+      id: spaceAvailabilityRules.id,
+      dayOfWeek: spaceAvailabilityRules.dayOfWeek,
+      startTime: spaceAvailabilityRules.startTime,
+      endTime: spaceAvailabilityRules.endTime,
+      isActive: spaceAvailabilityRules.isActive,
+    })
+    .from(spaceAvailabilityRules)
+    .where(
+      and(
+        eq(spaceAvailabilityRules.spaceId, space.id),
+        eq(spaceAvailabilityRules.isActive, true),
+      ),
+    )
+    .orderBy(asc(spaceAvailabilityRules.dayOfWeek));
+
+  return {
+    ...space,
+    availability,
   };
 }
 

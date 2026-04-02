@@ -18,10 +18,32 @@ import {
   renderMemberReminderEmail,
   renderRenewalTransactionalEmail,
   renderStaffDigestEmail,
+  renderSystemTestEmail,
 } from "@/services/notifications/email-templates";
 
 function getAppUrl() {
   return getEnv().APP_URL ?? "http://localhost:3000";
+}
+
+type NotificationDeliveryOutcome =
+  | { status: "sent"; providerMessageId: string | null }
+  | { status: "skipped"; reason: string }
+  | { status: "failed"; reason: string };
+
+function summarizeNotificationOutcomes(outcomes: NotificationDeliveryOutcome[]) {
+  return outcomes.reduce(
+    (summary, outcome) => {
+      summary.attempted += 1;
+      summary[outcome.status] += 1;
+      return summary;
+    },
+    {
+      attempted: 0,
+      sent: 0,
+      skipped: 0,
+      failed: 0,
+    },
+  );
 }
 
 async function recordNotificationDelivery({
@@ -147,6 +169,7 @@ async function attemptEmailDelivery({
       subject,
       html,
       text,
+      idempotencyKey: dedupeKey,
     });
 
     await finalizeNotificationDelivery({
@@ -158,6 +181,19 @@ async function attemptEmailDelivery({
   } catch (error) {
     await failNotificationDelivery(recorded.id, error);
     throw error;
+  }
+}
+
+async function attemptEmailDeliverySafely(
+  input: Parameters<typeof attemptEmailDelivery>[0],
+): Promise<NotificationDeliveryOutcome> {
+  try {
+    return await attemptEmailDelivery(input);
+  } catch (error) {
+    return {
+      status: "failed",
+      reason: error instanceof Error ? error.message : "Unknown email error",
+    };
   }
 }
 
@@ -275,6 +311,63 @@ export async function sendBookingCancelledNotifications(bookingId: string) {
   );
 }
 
+export async function sendBookingRescheduledNotifications(bookingId: string) {
+  const booking = await getBookingNotificationContext(bookingId);
+
+  if (!booking) {
+    return;
+  }
+
+  const appUrl = getAppUrl();
+  const memberEmail = renderBookingTransactionalEmail({
+    memberName: booking.memberName,
+    spaceName: booking.spaceName,
+    startsAt: booking.startsAt,
+    endsAt: booking.endsAt,
+    actionLabel: "reprogramada",
+    appUrl,
+  });
+  const scheduleKey = `${booking.startsAt.toISOString()}:${booking.endsAt.toISOString()}`;
+
+  await attemptEmailDelivery({
+    audience: "member",
+    eventType: "booking_rescheduled",
+    recipientEmail: booking.memberEmail,
+    recipientName: booking.memberName,
+    subject: memberEmail.subject,
+    html: memberEmail.html,
+    text: memberEmail.text,
+    dedupeKey: `booking-rescheduled-member:${booking.id}:${scheduleKey}`,
+    payload: {
+      bookingId: booking.id,
+      startsAt: booking.startsAt.toISOString(),
+      endsAt: booking.endsAt.toISOString(),
+    },
+  });
+
+  const staffRecipients = await listStaffNotificationRecipients();
+
+  await Promise.all(
+    staffRecipients.map((recipient) =>
+      attemptEmailDelivery({
+        audience: "staff",
+        eventType: "booking_rescheduled",
+        recipientEmail: recipient.email,
+        recipientName: recipient.fullName,
+        subject: `[Staff] ${memberEmail.subject}`,
+        html: memberEmail.html,
+        text: memberEmail.text,
+        dedupeKey: `booking-rescheduled-staff:${booking.id}:${recipient.email}:${scheduleKey}`,
+        payload: {
+          bookingId: booking.id,
+          startsAt: booking.startsAt.toISOString(),
+          endsAt: booking.endsAt.toISOString(),
+        },
+      }),
+    ),
+  );
+}
+
 export async function sendRenewalConfirmationNotification(renewalId: string) {
   const renewal = await getRenewalNotificationContext(renewalId);
 
@@ -333,7 +426,7 @@ export async function sendDailyReminderNotifications(now: Date = new Date()) {
     })),
   });
 
-  await Promise.all(
+  const staffResults = await Promise.all(
     plan.staffDigestDeliveries.map((delivery) => {
       const email = renderStaffDigestEmail({
         recipientName: delivery.recipientName,
@@ -342,7 +435,7 @@ export async function sendDailyReminderNotifications(now: Date = new Date()) {
         appUrl,
       });
 
-      return attemptEmailDelivery({
+      return attemptEmailDeliverySafely({
         audience: delivery.audience,
         eventType: "daily_staff_digest",
         recipientEmail: delivery.recipientEmail,
@@ -359,7 +452,7 @@ export async function sendDailyReminderNotifications(now: Date = new Date()) {
     }),
   );
 
-  await Promise.all(
+  const memberResults = await Promise.all(
     plan.memberReminderDeliveries.map((delivery) => {
       const email = renderMemberReminderEmail({
         memberName: delivery.recipientName,
@@ -370,7 +463,7 @@ export async function sendDailyReminderNotifications(now: Date = new Date()) {
         appUrl: `${appUrl}/member`,
       });
 
-      return attemptEmailDelivery({
+      return attemptEmailDeliverySafely({
         audience: delivery.audience,
         eventType: "daily_member_reminder",
         recipientEmail: delivery.recipientEmail,
@@ -387,8 +480,44 @@ export async function sendDailyReminderNotifications(now: Date = new Date()) {
     }),
   );
 
+  const outcomeSummary = summarizeNotificationOutcomes([
+    ...staffResults,
+    ...memberResults,
+  ]);
+
   return {
     staffDigestCount: plan.staffDigestDeliveries.length,
     memberReminderCount: plan.memberReminderDeliveries.length,
+    ...outcomeSummary,
   };
+}
+
+export async function sendSystemTestNotification({
+  recipientEmail,
+  recipientName,
+}: {
+  recipientEmail: string;
+  recipientName: string;
+}) {
+  const env = getEnv();
+  const appUrl = getAppUrl();
+  const email = renderSystemTestEmail({
+    recipientName,
+    appUrl,
+    transportMode: env.EMAIL_TRANSPORT_MODE ?? "log",
+  });
+
+  return attemptEmailDeliverySafely({
+    audience: "staff",
+    eventType: "system_test_email",
+    recipientEmail,
+    recipientName,
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
+    dedupeKey: `system-test:${recipientEmail}:${Date.now()}`,
+    payload: {
+      transportMode: env.EMAIL_TRANSPORT_MODE ?? "log",
+    },
+  });
 }

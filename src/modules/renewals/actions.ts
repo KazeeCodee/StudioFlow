@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { canRenewPlans } from "@/lib/permissions/guards";
 import { requireStaffContext } from "@/modules/auth/queries";
 import { sendRenewalConfirmationNotification } from "@/services/notifications/dispatcher";
 import { renewMemberPlan } from "@/services/renewals/renew-member-plan";
@@ -16,6 +17,11 @@ async function notifySafely(task: () => Promise<void>) {
 
 export async function renewMemberPlanAction(formData: FormData) {
   const { profile } = await requireStaffContext();
+
+  if (!canRenewPlans(profile.role)) {
+    redirect("/admin");
+  }
+
   const memberPlanId = String(formData.get("memberPlanId") ?? "");
   const notes = String(formData.get("notes") ?? "").trim() || undefined;
   const redirectTo = String(formData.get("redirectTo") ?? "").trim() || "/admin/renewals";

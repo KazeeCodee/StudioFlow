@@ -94,6 +94,8 @@ export async function changeMemberPasswordAction(formData: FormData) {
     throw new Error("No se pudo actualizar la contraseña.");
   }
 
+  await supabase.auth.signOut({ scope: "others" });
+
   const db = getDb();
   await db.insert(auditLogs).values({
     actorId: profile.id,

@@ -59,15 +59,20 @@ export default async function MemberBookingsPage() {
                     <TableCell>{booking.quotaConsumed}</TableCell>
                     <TableCell>{booking.status}</TableCell>
                     <TableCell className="text-right">
-                      {booking.status === "confirmed" ? (
-                        <form action={cancelBookingAction}>
-                          <input type="hidden" name="bookingId" value={booking.id} />
-                          <input type="hidden" name="redirectTo" value="/member/bookings" />
-                          <Button type="submit" variant="outline">
-                            Cancelar
-                          </Button>
-                        </form>
-                      ) : null}
+                      <div className="flex justify-end gap-2">
+                        <Button asChild variant="ghost">
+                          <Link href={`/member/bookings/${booking.id}`}>Ver detalle</Link>
+                        </Button>
+                        {booking.status === "confirmed" ? (
+                          <form action={cancelBookingAction}>
+                            <input type="hidden" name="bookingId" value={booking.id} />
+                            <input type="hidden" name="redirectTo" value="/member/bookings" />
+                            <Button type="submit" variant="outline">
+                              Cancelar
+                            </Button>
+                          </form>
+                        ) : null}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

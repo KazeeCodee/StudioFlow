@@ -111,6 +111,8 @@ export const spaces = pgTable("spaces", {
   slug: text("slug").notNull(),
   description: text("description"),
   imageUrl: text("image_url"),
+  galleryUrls: text("gallery_urls").array().notNull().default(sql`'{}'::text[]`),
+  videoLinks: text("video_links").array().notNull().default(sql`'{}'::text[]`),
   capacity: integer("capacity"),
   status: spaceStatusEnum("status").notNull().default("active"),
   hourlyQuotaCost: integer("hourly_quota_cost").notNull().default(1),

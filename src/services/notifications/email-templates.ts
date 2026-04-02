@@ -28,8 +28,14 @@ type BookingTransactionalEmailInput = {
   spaceName: string;
   startsAt: Date;
   endsAt: Date;
-  actionLabel: "confirmada" | "cancelada";
+  actionLabel: "confirmada" | "cancelada" | "reprogramada";
   appUrl: string;
+};
+
+type SystemTestEmailInput = {
+  recipientName: string;
+  appUrl: string;
+  transportMode: "log" | "resend";
 };
 
 function renderReminderReasonText(reasons: ReminderReason[], quotaRemaining: number) {
@@ -87,8 +93,8 @@ export function renderBookingTransactionalEmail({
   const subject = `StudioFlow: tu reserva fue ${actionLabel}`;
   const startLabel = formatStudioDateTime(startsAt);
   const endLabel = formatStudioDateTime(endsAt);
-  const text = `Hola ${memberName},\n\nTu reserva en ${spaceName} fue ${actionLabel}.\nHorario: ${startLabel} a ${endLabel}.\n\nMas detalles en ${appUrl}/member/bookings`;
-  const html = `<p>Hola ${memberName},</p><p>Tu reserva en <strong>${spaceName}</strong> fue <strong>${actionLabel}</strong>.</p><p>Horario: ${startLabel} a ${endLabel}.</p><p>Mas detalles en <a href="${appUrl}/member/bookings">${appUrl}/member/bookings</a>.</p>`;
+  const text = `Hola ${memberName},\n\nTu reserva en ${spaceName} fue ${actionLabel}.\nHorario vigente: ${startLabel} a ${endLabel}.\n\nPuedes revisar el detalle en ${appUrl}/member/bookings.`;
+  const html = `<p>Hola ${memberName},</p><p>Tu reserva en <strong>${spaceName}</strong> fue <strong>${actionLabel}</strong>.</p><p>Horario vigente: <strong>${startLabel}</strong> a <strong>${endLabel}</strong>.</p><p>Puedes revisar el detalle en <a href="${appUrl}/member/bookings">${appUrl}/member/bookings</a>.</p>`;
 
   return { subject, text, html };
 }
@@ -114,4 +120,16 @@ export function renderRenewalTransactionalEmail({
   return { subject, text, html };
 }
 
-export type { EmailContent, MemberReminderEmailInput, StaffDigestEmailInput };
+export function renderSystemTestEmail({
+  recipientName,
+  appUrl,
+  transportMode,
+}: SystemTestEmailInput): EmailContent {
+  const subject = "StudioFlow: prueba de notificaciones";
+  const text = `Hola ${recipientName},\n\nEste es un correo de prueba para validar la configuracion de notificaciones de StudioFlow.\nModo de transporte activo: ${transportMode}.\n\nPanel administrativo: ${appUrl}/admin/settings`;
+  const html = `<p>Hola ${recipientName},</p><p>Este es un correo de prueba para validar la configuracion de notificaciones de <strong>StudioFlow</strong>.</p><p>Modo de transporte activo: <strong>${transportMode}</strong>.</p><p>Puedes volver al panel desde <a href="${appUrl}/admin/settings">${appUrl}/admin/settings</a>.</p>`;
+
+  return { subject, text, html };
+}
+
+export type { EmailContent, MemberReminderEmailInput, StaffDigestEmailInput, SystemTestEmailInput };

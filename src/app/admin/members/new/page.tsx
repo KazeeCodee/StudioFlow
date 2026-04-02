@@ -1,7 +1,16 @@
+import { redirect } from "next/navigation";
 import { MemberForm } from "@/components/forms/member-form";
+import { canManageMembers } from "@/lib/permissions/guards";
+import { requireStaffContext } from "@/modules/auth/queries";
 import { listActivePlanOptions } from "@/modules/plans/queries";
 
 export default async function NewMemberPage() {
+  const { profile } = await requireStaffContext();
+
+  if (!canManageMembers(profile.role)) {
+    redirect("/admin");
+  }
+
   const planOptions = await listActivePlanOptions();
 
   return (

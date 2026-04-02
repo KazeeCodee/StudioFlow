@@ -8,15 +8,15 @@ import {
 } from "@/lib/permissions/roles";
 
 export function canManagePlans(role: AppRole) {
-  return isStaffRole(role);
+  return configManagerRoles.includes(role);
 }
 
 export function canManageMembers(role: AppRole) {
-  return isStaffRole(role);
+  return configManagerRoles.includes(role);
 }
 
 export function canManageSpaces(role: AppRole) {
-  return isStaffRole(role);
+  return configManagerRoles.includes(role);
 }
 
 export function canManageBookings(role: AppRole) {
@@ -24,6 +24,10 @@ export function canManageBookings(role: AppRole) {
 }
 
 export function canManageSettings(role: AppRole) {
+  return configManagerRoles.includes(role);
+}
+
+export function canManageStaffUsers(role: AppRole) {
   return configManagerRoles.includes(role);
 }
 

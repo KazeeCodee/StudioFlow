@@ -89,6 +89,8 @@ export async function listRecentNotificationDeliveries(limit = 20) {
       recipientEmail: notificationDeliveries.recipientEmail,
       subject: notificationDeliveries.subject,
       status: notificationDeliveries.status,
+      providerMessageId: notificationDeliveries.providerMessageId,
+      errorMessage: notificationDeliveries.errorMessage,
       createdAt: notificationDeliveries.createdAt,
       sentAt: notificationDeliveries.sentAt,
     })

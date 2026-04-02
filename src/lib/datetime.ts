@@ -162,3 +162,13 @@ export function formatStudioDateTime(date: Date) {
     hourCycle: "h23",
   });
 }
+
+export function formatStudioDateTimeInputValue(date: Date) {
+  const { year, month, day, hour, minute } = getStudioDateTimeParts(date);
+
+  return `${year.toString().padStart(4, "0")}-${month
+    .toString()
+    .padStart(2, "0")}-${day.toString().padStart(2, "0")}T${hour
+    .toString()
+    .padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+}

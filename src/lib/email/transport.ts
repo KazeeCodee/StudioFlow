@@ -5,6 +5,7 @@ export type SendEmailInput = {
   subject: string;
   html: string;
   text: string;
+  idempotencyKey?: string;
 };
 
 export type SendEmailResult =
@@ -16,6 +17,7 @@ export async function sendEmail({
   subject,
   html,
   text,
+  idempotencyKey,
 }: SendEmailInput): Promise<SendEmailResult> {
   const env = getEnv();
   const mode = env.EMAIL_TRANSPORT_MODE ?? "log";
@@ -40,6 +42,7 @@ export async function sendEmail({
     headers: {
       Authorization: `Bearer ${env.RESEND_API_KEY}`,
       "Content-Type": "application/json",
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
     body: JSON.stringify({
       from: env.EMAIL_FROM,

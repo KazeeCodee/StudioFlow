@@ -1,11 +1,5 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import {
-  getStudioDateTimeParts,
-  getStudioMinutesSinceMidnight,
-  isSameStudioDay,
-  parseStudioDateTimeInput,
-} from "@/lib/datetime";
 import { auditLogs, bookingStatusHistory, bookings, memberPlans } from "@/lib/db/schema";
 import type { AuthenticatedProfile } from "@/modules/auth/types";
 import type { BookingInput } from "@/modules/bookings/schema";
@@ -19,76 +13,7 @@ import {
 import { getOperationalSettings } from "@/modules/settings/queries";
 import { calculateBookingQuota } from "@/services/bookings/calculate-booking-quota";
 import { applyBookingBuffer, hasOverlap } from "@/services/bookings/check-availability";
-
-function parseTimeToMinutes(value: string) {
-  const [hours, minutes] = value.split(":").map(Number);
-  return hours * 60 + minutes;
-}
-
-function validateBookingWindow(startsAtInput: string, endsAtInput: string) {
-  const startsAt = parseStudioDateTimeInput(startsAtInput);
-  const endsAt = parseStudioDateTimeInput(endsAtInput);
-
-  if (endsAt <= startsAt) {
-    throw new Error("El fin debe ser posterior al inicio.");
-  }
-
-  if (
-    startsAt.getUTCMinutes() !== 0 ||
-    endsAt.getUTCMinutes() !== 0 ||
-    startsAt.getUTCSeconds() !== 0 ||
-    endsAt.getUTCSeconds() !== 0
-  ) {
-    throw new Error("Las reservas deben comenzar y terminar en horas enteras.");
-  }
-
-  if (!isSameStudioDay(startsAt, endsAt)) {
-    throw new Error("La reserva debe quedar dentro del mismo dia.");
-  }
-
-  const durationHours = (endsAt.getTime() - startsAt.getTime()) / 3_600_000;
-
-  if (!Number.isInteger(durationHours) || durationHours <= 0) {
-    throw new Error("La reserva debe durar una cantidad entera de horas.");
-  }
-
-  return {
-    startsAt,
-    endsAt,
-    durationHours,
-  };
-}
-
-function assertWithinAvailability({
-  startsAt,
-  endsAt,
-  availabilityRules,
-}: {
-  startsAt: Date;
-  endsAt: Date;
-  availabilityRules: {
-    dayOfWeek: number;
-    startTime: string;
-    endTime: string;
-    isActive: boolean;
-  }[];
-}) {
-  const dayOfWeek = getStudioDateTimeParts(startsAt).dayOfWeek;
-  const rule = availabilityRules.find((item) => item.dayOfWeek === dayOfWeek && item.isActive);
-
-  if (!rule) {
-    throw new Error("El espacio no opera en el dia seleccionado.");
-  }
-
-  const bookingStart = getStudioMinutesSinceMidnight(startsAt);
-  const bookingEnd = getStudioMinutesSinceMidnight(endsAt);
-  const ruleStart = parseTimeToMinutes(rule.startTime);
-  const ruleEnd = parseTimeToMinutes(rule.endTime);
-
-  if (bookingStart < ruleStart || bookingEnd > ruleEnd) {
-    throw new Error("La reserva queda fuera del horario disponible del espacio.");
-  }
-}
+import { assertWithinAvailability, validateBookingWindow } from "@/services/bookings/booking-validation";
 
 export async function createBooking(input: BookingInput, actor: AuthenticatedProfile) {
   const targetMemberId =
