@@ -20,5 +20,10 @@ describe("AppShell", () => {
     expect(screen.getByText("Contenido")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Principal" })).toBeInTheDocument();
     expect(screen.getAllByText("Ada Lovelace")).toHaveLength(2);
+    expect(screen.getByText("KazeCode")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Desarrollado por KazeCode/i })).toHaveAttribute(
+      "href",
+      "https://kazecode.com.ar",
+    );
   });
 });

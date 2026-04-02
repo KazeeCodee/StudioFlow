@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Film, Sparkles } from "lucide-react";
+import Image from "next/image";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -47,12 +47,14 @@ export function AppShell({
       <aside className="hidden w-[260px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
         {/* Brand header */}
         <div className="flex items-center gap-3 px-5 py-5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/30">
-            {isMember ? (
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-            ) : (
-              <Film className="h-4 w-4" aria-hidden="true" />
-            )}
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#f3faff] ring-1 ring-primary/10">
+            <Image
+              src="/branding/kazecode-logo.svg"
+              alt="KazeCode"
+              width={36}
+              height={36}
+              className="h-9 w-9 object-contain"
+            />
           </div>
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
@@ -73,22 +75,51 @@ export function AppShell({
 
         <Separator className="opacity-50" />
 
-        {/* User footer */}
-        <div className="flex items-center gap-2.5 p-3">
-          <Avatar className="h-8 w-8 shrink-0 border border-border/60">
-            <AvatarFallback className="bg-primary/15 text-xs font-bold text-primary">
-              {getUserInitials(user.name)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-semibold text-foreground leading-none">
-              {user.name}
-            </p>
-            <p className="mt-1 truncate text-[10px] text-muted-foreground leading-none">
-              {user.email}
-            </p>
+        {/* Footer */}
+        <div className="space-y-3 p-3">
+          <div className="flex items-center gap-2.5">
+            <Avatar className="h-8 w-8 shrink-0 border border-border/60">
+              <AvatarFallback className="bg-primary/15 text-xs font-bold text-primary">
+                {getUserInitials(user.name)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-foreground leading-none">
+                {user.name}
+              </p>
+              <p className="mt-1 truncate text-[10px] text-muted-foreground leading-none">
+                {user.email}
+              </p>
+            </div>
+            <ThemeToggle className="shrink-0 text-muted-foreground" />
           </div>
-          <ThemeToggle className="shrink-0 text-muted-foreground" />
+
+          <Separator className="opacity-50" />
+
+          <a
+            href="https://kazecode.com.ar"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Desarrollado por KazeCode"
+            className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/70 px-2.5 py-2 transition-colors hover:bg-accent/60"
+          >
+            <Image
+              src="/branding/kazecode-logo-round.png"
+              alt=""
+              aria-hidden="true"
+              width={28}
+              height={28}
+              className="h-7 w-7 shrink-0 rounded-full object-cover"
+            />
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                Desarrollado por
+              </p>
+              <p className="truncate text-xs font-semibold text-foreground">
+                KazeCode
+              </p>
+            </div>
+          </a>
         </div>
       </aside>
 
