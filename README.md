@@ -109,6 +109,30 @@ Después podés entrar por [http://localhost:3000/login](http://localhost:3000/l
 npm run dev
 ```
 
+## Deploy en Railway
+
+El repo incluye configuracion para Railway/Nixpacks:
+
+- `nixpacks.toml` fuerza `npm ci`, `npm run build` y `npm run start`
+- `.nvmrc` y `package.json` fijan Node 20
+
+Variables minimas a cargar en Railway:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `DATABASE_URL`
+- `APP_URL`
+- `CRON_SECRET`
+
+Variables recomendadas:
+
+- `DATABASE_POOL_MAX=1`
+- `EMAIL_TRANSPORT_MODE`
+- `EMAIL_FROM`
+- `RESEND_API_KEY`
+- `USE_NEXT_RSPACK=false`
+
 ## Checks de calidad
 
 ```bash
