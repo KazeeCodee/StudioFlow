@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { Film, CheckCircle2, CalendarDays, Users } from "lucide-react";
+import { CheckCircle2, CalendarDays, Users } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,34 +10,34 @@ import { loginAction } from "@/app/(auth)/actions";
 
 export const metadata: Metadata = {
   title: "Ingresar",
-  description: "Acceso para staff y miembros del estudio audiovisual.",
+  description: "Acceso para gestionar reservas, membresias y operacion diaria.",
 };
 
 const errorMessages: Record<string, { title: string; description: string }> = {
   invalid_credentials: {
-    title: "Credenciales inválidas",
-    description: "Revisá el email y la contraseña e intentá nuevamente.",
+    title: "Credenciales invalidas",
+    description: "Revisa el email y la contrasena e intenta nuevamente.",
   },
   profile_not_found: {
     title: "Acceso incompleto",
     description:
-      "Tu usuario existe pero todavía no tiene un perfil operativo asignado.",
+      "Tu usuario existe pero todavia no tiene un perfil operativo asignado.",
   },
   missing_credentials: {
     title: "Faltan datos",
-    description: "Necesitamos email y contraseña para iniciar sesión.",
+    description: "Necesitamos email y contrasena para iniciar sesion.",
   },
   account_inactive: {
     title: "Cuenta no disponible",
     description:
-      "Tu cuenta está inactiva o suspendida. Contactá a un administrador.",
+      "Tu cuenta esta inactiva o suspendida. Contacta a un administrador.",
   },
 };
 
 const statusMessages: Record<string, { title: string; description: string }> = {
   password_reset: {
-    title: "Contraseña actualizada",
-    description: "Ya podés ingresar con tu nueva contraseña.",
+    title: "Contrasena actualizada",
+    description: "Ya podes ingresar con tu nueva contrasena.",
   },
 };
 
@@ -51,18 +52,18 @@ type LoginPageProps = {
 const features = [
   {
     icon: CalendarDays,
-    title: "Reservas sin solapes",
-    desc: "Sistema de disponibilidad en tiempo real por espacio y horario.",
+    title: "Agenda centralizada",
+    desc: "Visualiza disponibilidad por espacio y horario antes de confirmar cada reserva.",
   },
   {
     icon: Users,
-    title: "Membresías con cuotas",
-    desc: "Cada plan asigna cuotas que se descuentan automáticamente al reservar.",
+    title: "Membresias bajo control",
+    desc: "Administra planes, renovaciones y cuotas disponibles sin planillas paralelas.",
   },
   {
     icon: CheckCircle2,
-    title: "Alertas operativas",
-    desc: "Detectá renovaciones próximas y cupos críticos desde el dashboard.",
+    title: "Operacion mas clara",
+    desc: "Detecta vencimientos, ocupacion y pendientes desde un solo panel.",
   },
 ];
 
@@ -73,9 +74,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <main className="flex min-h-screen bg-background">
-      {/* ── Brand panel (desktop) ─────────────────────────────────────────── */}
       <div className="relative hidden overflow-hidden lg:flex lg:w-[55%] xl:w-[60%]">
-        {/* Background gradient */}
         <div
           className="absolute inset-0"
           style={{
@@ -84,7 +83,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           }}
         />
 
-        {/* Decorative circles */}
         <div
           className="pointer-events-none absolute -left-24 -top-24 h-[500px] w-[500px] rounded-full opacity-20"
           style={{
@@ -102,46 +100,49 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           aria-hidden="true"
         />
 
-        {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-10 xl:p-14">
-          {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/30">
-              <Film className="h-5 w-5 text-primary-foreground" aria-hidden="true" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f3faff] ring-1 ring-white/15">
+              <Image
+                src="/branding/kazecode-logo.svg"
+                alt="KazeCode"
+                width={36}
+                height={36}
+                className="h-8 w-auto object-contain"
+                priority
+              />
             </div>
             <span className="text-sm font-bold uppercase tracking-[0.2em] text-white/80">
               StudioFlow
             </span>
           </div>
 
-          {/* Headline */}
           <div className="space-y-8">
             <div className="space-y-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
-                Plataforma de gestión
+                Software de gestion
               </p>
               <h1 className="text-4xl font-bold leading-tight tracking-tight text-white xl:text-5xl">
-                Operación, cupos y reservas del estudio en un solo lugar.
+                Gestioná reservas, membresías y operación diaria desde una sola
+                plataforma.
               </h1>
               <p className="max-w-md text-base leading-relaxed text-white/60">
-                Staff y miembros comparten la misma plataforma con accesos
-                diferenciados para reservas, control de planes y seguimiento de
-                vencimientos.
+                Centralizá agenda, cupos y seguimiento comercial en una
+                experiencia clara para tu equipo y tus clientes.
               </p>
             </div>
 
-            {/* Feature list */}
             <ul className="space-y-4" role="list">
-              {features.map((f) => {
-                const Icon = f.icon;
+              {features.map((feature) => {
+                const Icon = feature.icon;
                 return (
-                  <li key={f.title} className="flex items-start gap-3">
+                  <li key={feature.title} className="flex items-start gap-3">
                     <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary/20">
                       <Icon className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-white">{f.title}</p>
-                      <p className="text-xs text-white/50 mt-0.5">{f.desc}</p>
+                      <p className="text-sm font-semibold text-white">{feature.title}</p>
+                      <p className="mt-0.5 text-xs text-white/50">{feature.desc}</p>
                     </div>
                   </li>
                 );
@@ -149,12 +150,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </ul>
           </div>
 
-          {/* Footer stats */}
           <dl className="grid grid-cols-3 gap-3">
             {[
-              { label: "Reservas", value: "Sin solapes" },
-              { label: "Planes", value: "Con cuotas" },
-              { label: "Alertas", value: "Automáticas" },
+              { label: "Reservas", value: "Ordenadas" },
+              { label: "Membresias", value: "Activas" },
+              { label: "Operacion", value: "Visible" },
             ].map((stat) => (
               <div
                 key={stat.label}
@@ -170,12 +170,17 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
       </div>
 
-      {/* ── Login panel ───────────────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 lg:px-12">
-        {/* Mobile logo */}
         <div className="mb-8 flex items-center gap-3 lg:hidden">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-sm shadow-primary/30">
-            <Film className="h-4 w-4 text-primary-foreground" aria-hidden="true" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f3faff] ring-1 ring-primary/10">
+            <Image
+              src="/branding/kazecode-logo.svg"
+              alt="KazeCode"
+              width={34}
+              height={34}
+              className="h-7 w-auto object-contain"
+              priority
+            />
           </div>
           <span className="text-sm font-bold uppercase tracking-[0.18em] text-primary">
             StudioFlow
@@ -183,17 +188,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
 
         <div className="w-full max-w-sm space-y-7">
-          {/* Header */}
           <div className="space-y-1.5">
             <h2 className="text-2xl font-bold tracking-tight text-foreground">
-              Bienvenido de vuelta
+              Ingresá a tu cuenta
             </h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Accedé con las credenciales configuradas por el staff.
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Accedé con tu email y contraseña para administrar reservas,
+              membresías y seguimiento diario.
             </p>
           </div>
 
-          {/* Alerts */}
           {statusAlert && (
             <Alert className="border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10">
               <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -213,7 +217,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </Alert>
           )}
 
-          {/* Form */}
           <form action={loginAction} className="space-y-5">
             <input type="hidden" name="next" value={params.next ?? ""} />
 
@@ -226,7 +229,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 name="email"
                 type="email"
                 autoComplete="email"
-                placeholder="nombre@studioflow.com"
+                placeholder="nombre@tuestudio.com"
                 required
                 className="h-10 border-border/70 bg-background text-sm"
               />
@@ -235,14 +238,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-sm font-medium">
-                  Contraseña
+                  Contrasena
                 </Label>
                 <Button
                   asChild
                   variant="link"
                   className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
                 >
-                  <Link href="/forgot-password">¿Olvidaste tu contraseña?</Link>
+                  <Link href="/forgot-password">Olvidé mi contraseña</Link>
                 </Button>
               </div>
               <Input
@@ -260,17 +263,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               type="submit"
               className="h-10 w-full rounded-xl text-sm font-semibold shadow-sm shadow-primary/20"
             >
-              Ingresar al estudio
+              Ingresar a StudioFlow
             </Button>
           </form>
 
-          {/* Footer */}
-          <p className="text-center text-xs text-muted-foreground">
-            ¿Problemas para acceder?{" "}
-            <Button asChild variant="link" className="h-auto px-0 text-xs">
-              <Link href="/">Hablá con el staff</Link>
-            </Button>
-          </p>
         </div>
       </div>
     </main>
