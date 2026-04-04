@@ -59,7 +59,7 @@ export function BookingsCalendar({ events }: BookingsCalendarProps) {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-hidden rounded-[24px] border border-border/70 bg-background p-3">
+          <div className="studio-calendar overflow-hidden rounded-[24px] border border-border/70 bg-background p-3">
             <FullCalendar
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
               initialView="timeGridWeek"

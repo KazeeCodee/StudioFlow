@@ -3,7 +3,7 @@ import { BookingsCalendar } from "@/components/calendar/bookings-calendar";
 
 describe("BookingsCalendar", () => {
   it("renderiza eventos recibidos", () => {
-    render(
+    const { container } = render(
       <BookingsCalendar
         events={[
           {
@@ -22,5 +22,6 @@ describe("BookingsCalendar", () => {
     );
 
     expect(screen.getAllByText("Reserva").length).toBeGreaterThan(0);
+    expect(container.querySelector(".studio-calendar")).toBeInTheDocument();
   });
 });

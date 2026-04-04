@@ -248,4 +248,75 @@
     box-shadow: 0 0 0 1px oklch(0.720 0.175 280 / 30%),
                 0 1px 4px oklch(0.720 0.175 280 / 15%);
   }
+
+  .studio-calendar {
+    --fc-page-bg-color: var(--background);
+    --fc-neutral-bg-color: var(--muted);
+    --fc-neutral-text-color: var(--muted-foreground);
+    --fc-border-color: var(--border);
+    --fc-button-text-color: var(--foreground);
+    --fc-button-bg-color: var(--secondary);
+    --fc-button-border-color: var(--border);
+    --fc-button-hover-bg-color: var(--accent);
+    --fc-button-hover-border-color: var(--border);
+    --fc-button-active-bg-color: var(--primary);
+    --fc-button-active-border-color: var(--primary);
+    --fc-more-link-bg-color: var(--muted);
+    --fc-more-link-text-color: var(--foreground);
+    --fc-today-bg-color: oklch(0.88 0.08 95 / 0.18);
+    --fc-now-indicator-color: var(--primary);
+  }
+
+  .dark .studio-calendar {
+    --fc-neutral-bg-color: oklch(0.22 0.015 280 / 0.9);
+    --fc-button-bg-color: oklch(0.24 0.022 280);
+    --fc-button-hover-bg-color: oklch(0.30 0.03 280);
+    --fc-button-active-bg-color: oklch(0.40 0.11 280);
+    --fc-button-active-border-color: oklch(0.46 0.14 280);
+    --fc-more-link-bg-color: oklch(0.24 0.016 280);
+    --fc-today-bg-color: oklch(0.50 0.10 95 / 0.22);
+  }
+
+  .studio-calendar .fc {
+    color: var(--foreground);
+  }
+
+  .studio-calendar .fc .fc-toolbar-title {
+    font-size: clamp(1.5rem, 2vw, 2rem);
+    font-weight: 700;
+  }
+
+  .studio-calendar .fc .fc-button {
+    border-radius: 0.85rem;
+    box-shadow: none;
+    font-weight: 600;
+  }
+
+  .studio-calendar .fc .fc-button:focus,
+  .studio-calendar .fc .fc-button-primary:focus {
+    box-shadow: 0 0 0 3px oklch(0.60 0.165 280 / 0.22);
+  }
+
+  .studio-calendar .fc .fc-scrollgrid,
+  .studio-calendar .fc .fc-scrollgrid-section > *,
+  .studio-calendar .fc .fc-timegrid-axis-frame,
+  .studio-calendar .fc .fc-timegrid-slot-label-frame {
+    background-color: var(--fc-page-bg-color);
+  }
+
+  .studio-calendar .fc .fc-col-header-cell-cushion,
+  .studio-calendar .fc .fc-timegrid-slot-label-cushion,
+  .studio-calendar .fc .fc-daygrid-day-number {
+    color: var(--muted-foreground);
+    font-weight: 500;
+  }
+
+  .studio-calendar .fc .fc-timegrid-axis-cushion {
+    color: var(--foreground);
+    font-weight: 600;
+  }
+
+  .studio-calendar .fc .fc-event {
+    box-shadow: none;
+  }
 }
