@@ -85,40 +85,38 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   const transportMode = env.EMAIL_TRANSPORT_MODE ?? "log";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
         <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
           Configuracion
         </p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+        <h2 className="mt-1.5 text-2xl font-semibold tracking-tight">
           Parametros operativos
         </h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Ajusta reglas globales, revisa el estado del transporte de emails y ejecuta
-          pruebas controladas del cron diario.
+        <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
+          Ajusta reglas globales y valida emails o cron cuando haga falta.
         </p>
       </div>
 
       {feedback ? (
-        <Card className="rounded-[28px] border-border/70 shadow-sm">
-          <CardContent className="pt-6 text-sm text-muted-foreground">{feedback}</CardContent>
+        <Card size="sm" className="rounded-[28px] border-border/70 shadow-sm">
+          <CardContent className="pt-4 text-sm text-muted-foreground">{feedback}</CardContent>
         </Card>
       ) : null}
 
-      <Card className="rounded-[28px] border-border/70 shadow-sm">
-        <CardHeader>
+      <Card size="sm" className="rounded-[28px] border-border/70 shadow-sm">
+        <CardHeader className="gap-0.5">
           <CardTitle>Reglas globales</CardTitle>
-          <CardDescription>
-            Estos cambios impactan el dashboard, las alertas de renovaciones y la
-            validacion del motor de reservas.
+          <CardDescription className="text-xs">
+            Alertas, dashboard y reservas.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form
             action={updateOperationalSettingsAction}
-            className="grid gap-5 lg:grid-cols-3"
+            className="grid gap-4 lg:grid-cols-3"
           >
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="renewalWindowDays">Ventana de renovaciones</Label>
               <Input
                 id="renewalWindowDays"
@@ -129,11 +127,11 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                 defaultValue={settings.renewalWindowDays}
               />
               <p className="text-xs text-muted-foreground">
-                Cantidad de dias a futuro para mostrar vencimientos y seguimientos.
+                Dias a futuro para vencimientos y seguimiento.
               </p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="lowQuotaThreshold">Umbral de cupos bajos</Label>
               <Input
                 id="lowQuotaThreshold"
@@ -144,11 +142,11 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                 defaultValue={settings.lowQuotaThreshold}
               />
               <p className="text-xs text-muted-foreground">
-                Cuando un miembro tenga este saldo o menos, aparecera como cupo critico.
+                Saldo maximo para marcar cupo critico.
               </p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="bookingBufferHours">Buffer entre reservas</Label>
               <Input
                 id="bookingBufferHours"
@@ -159,26 +157,26 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                 defaultValue={settings.bookingBufferHours}
               />
               <p className="text-xs text-muted-foreground">
-                Horas bloqueadas antes y despues de cada reserva nueva.
+                Horas bloqueadas antes y despues de cada reserva.
               </p>
             </div>
 
             <div className="flex justify-end lg:col-span-3">
-              <Button type="submit">Guardar configuracion</Button>
+              <Button type="submit" size="sm">Guardar configuracion</Button>
             </div>
           </form>
         </CardContent>
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <Card className="rounded-[28px] border-border/70 shadow-sm">
-          <CardHeader>
+        <Card size="sm" className="rounded-[28px] border-border/70 shadow-sm">
+          <CardHeader className="gap-0.5">
             <CardTitle>Notificaciones y cron</CardTitle>
             <CardDescription>
               Estado de configuracion para envio real y herramientas manuales de validacion.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-border/70 bg-background p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -208,8 +206,8 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               </div>
             </div>
 
-            <form action={sendTestNotificationAction} className="space-y-3 rounded-2xl border border-border/70 bg-background p-4">
-              <div className="space-y-2">
+            <form action={sendTestNotificationAction} className="space-y-2.5 rounded-2xl border border-border/70 bg-background p-4">
+              <div className="space-y-1.5">
                 <Label htmlFor="recipientEmail">Correo de prueba</Label>
                 <Input
                   id="recipientEmail"
@@ -223,26 +221,26 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                 </p>
               </div>
               <div className="flex justify-end">
-                <Button type="submit" variant="outline">
+                <Button type="submit" variant="outline" size="sm">
                   Enviar prueba
                 </Button>
               </div>
             </form>
 
-            <form action={runDailyNotificationsNowAction} className="space-y-3 rounded-2xl border border-border/70 bg-background p-4">
+            <form action={runDailyNotificationsNowAction} className="space-y-2.5 rounded-2xl border border-border/70 bg-background p-4">
               <p className="text-sm text-muted-foreground">
                 Ejecuta ahora el mismo flujo que corre el cron diario. Si ya corrio hoy, la
                 deduplicacion puede marcar entregas como omitidas.
               </p>
               <div className="flex justify-end">
-                <Button type="submit">Ejecutar cron ahora</Button>
+                <Button type="submit" size="sm">Ejecutar cron ahora</Button>
               </div>
             </form>
           </CardContent>
         </Card>
 
-        <Card className="rounded-[28px] border-border/70 shadow-sm">
-          <CardHeader>
+        <Card size="sm" className="rounded-[28px] border-border/70 shadow-sm">
+          <CardHeader className="gap-0.5">
             <CardTitle>Estado actual</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
@@ -257,8 +255,8 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </Card>
       </div>
 
-      <Card className="rounded-[28px] border-border/70 shadow-sm">
-        <CardHeader>
+      <Card size="sm" className="rounded-[28px] border-border/70 shadow-sm">
+        <CardHeader className="gap-0.5">
           <CardTitle>Ultimas entregas</CardTitle>
           <CardDescription>
             Historial reciente para validar textos, dedupe y fallas del proveedor.

@@ -12,7 +12,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <AppShell
       title="Centro operativo"
-      subtitle="Reservas, miembros, renovaciones y seguimiento del estudio desde una sola consola."
+      subtitle="Reservas, miembros y renovaciones desde una sola consola."
       role={profile.role}
       user={{
         name: profile.fullName,
