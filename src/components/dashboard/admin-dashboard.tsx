@@ -10,6 +10,8 @@ import {
   MapPinned,
   Plus,
   TrendingUp,
+  XCircle,
+  Zap,
 } from "lucide-react";
 import { formatStudioDayMonth, formatStudioTime } from "@/lib/datetime";
 import { BookingStatusBadge } from "@/components/ui/status-badge";
@@ -40,56 +42,121 @@ type AdminDashboardProps = {
 type BookingStatus = AdminDashboardData["todayAgenda"][number]["status"];
 
 export function AdminDashboard({ data }: AdminDashboardProps) {
+  const agendaBreakdown = data.todayAgenda.reduce(
+    (acc, item) => {
+      if (item.status === "confirmed") acc.confirmed += 1;
+      else if (item.status === "pending") acc.pending += 1;
+      else if (item.status === "completed") acc.completed += 1;
+      return acc;
+    },
+    { confirmed: 0, pending: 0, completed: 0 },
+  );
+
   return (
     <div className="space-y-8">
       {/* ── Metric cards ──────────────────────────────────────────────────── */}
-      <section aria-label="Métricas principales" className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-5">
+      <section aria-label="Métricas principales" className="space-y-4">
         <StatCard
           label="Reservas hoy"
           value={data.metrics.bookingsToday}
           icon={CalendarClock}
           tone="cyan"
+          size="hero"
+          description={
+            data.metrics.bookingsToday === 0
+              ? "Sin actividad programada"
+              : "Distribución por estado en el día"
+          }
+          breakdown={
+            data.metrics.bookingsToday > 0 ? (
+              <dl className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <div className="flex items-baseline gap-2">
+                  <span
+                    className="h-2 w-2 rounded-full bg-emerald-500"
+                    aria-hidden="true"
+                  />
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Confirmadas
+                  </dt>
+                  <dd className="text-sm font-semibold tabular-nums text-foreground">
+                    {agendaBreakdown.confirmed}
+                  </dd>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span
+                    className="h-2 w-2 rounded-full bg-amber-500"
+                    aria-hidden="true"
+                  />
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Pendientes
+                  </dt>
+                  <dd className="text-sm font-semibold tabular-nums text-foreground">
+                    {agendaBreakdown.pending}
+                  </dd>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span
+                    className="h-2 w-2 rounded-full bg-muted-foreground/60"
+                    aria-hidden="true"
+                  />
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Completadas
+                  </dt>
+                  <dd className="text-sm font-semibold tabular-nums text-foreground">
+                    {agendaBreakdown.completed}
+                  </dd>
+                </div>
+              </dl>
+            ) : undefined
+          }
         />
-        <StatCard
-          label="Horas esta semana"
-          value={data.metrics.bookedHoursThisWeek}
-          suffix="h"
-          icon={Clock3}
-          tone="emerald"
-        />
-        <StatCard
-          label="Miembros activos"
-          value={data.metrics.activeMembers}
-          icon={Users}
-          tone="violet"
-        />
-        <StatCard
-          label="Renovaciones próximas"
-          value={data.metrics.upcomingRenewals}
-          icon={CreditCard}
-          tone="amber"
-          description={data.metrics.upcomingRenewals > 0 ? "Requieren seguimiento" : undefined}
-        />
-        <StatCard
-          label="Cupos críticos"
-          value={data.metrics.lowQuotaPlans}
-          icon={WalletCards}
-          tone="rose"
-          description={data.metrics.lowQuotaPlans > 0 ? "Por debajo del umbral" : undefined}
-        />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Horas esta semana"
+            value={data.metrics.bookedHoursThisWeek}
+            suffix="h"
+            icon={Clock3}
+            tone="emerald"
+          />
+          <StatCard
+            label="Miembros activos"
+            value={data.metrics.activeMembers}
+            icon={Users}
+            tone="violet"
+          />
+          <StatCard
+            label="Renovaciones próximas"
+            value={data.metrics.upcomingRenewals}
+            icon={CreditCard}
+            tone="amber"
+            description={data.metrics.upcomingRenewals > 0 ? "Requieren seguimiento" : undefined}
+          />
+          <StatCard
+            label="Cupos críticos"
+            value={data.metrics.lowQuotaPlans}
+            icon={WalletCards}
+            tone="rose"
+            description={data.metrics.lowQuotaPlans > 0 ? "Por debajo del umbral" : undefined}
+          />
+        </div>
       </section>
 
       {/* ── Agenda + Quick actions ─────────────────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         {/* Today's agenda */}
-        <Card className="rounded-2xl border-border/60 shadow-sm">
+        <Card className="rounded-2xl border-border/60 shadow-sm transition-shadow hover:shadow-md">
           <CardHeader className="border-b border-border/60 pb-4">
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-base font-semibold">Agenda de hoy</CardTitle>
-                <CardDescription className="mt-0.5 text-sm">
-                  Reservas activas del día con su franja, espacio y cupos.
-                </CardDescription>
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400" aria-hidden="true">
+                  <CalendarDays className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-base font-semibold">Agenda de hoy</CardTitle>
+                  <CardDescription className="mt-0.5 text-sm">
+                    Reservas activas del día con su franja, espacio y cupos.
+                  </CardDescription>
+                </div>
               </div>
               <Button asChild variant="ghost" size="sm" className="rounded-lg shrink-0">
                 <Link href="/admin/calendar">
@@ -147,14 +214,21 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
         </Card>
 
         {/* Quick actions */}
-        <Card className="rounded-2xl border-border/60 shadow-sm">
+        <Card className="rounded-2xl border-border/60 shadow-sm transition-shadow hover:shadow-md">
           <CardHeader className="border-b border-border/60 pb-4">
-            <CardTitle className="text-base font-semibold">Accesos rápidos</CardTitle>
-            <CardDescription className="mt-0.5 text-sm">
-              Acciones frecuentes de un vistazo.
-            </CardDescription>
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400" aria-hidden="true">
+                <Zap className="h-4 w-4" />
+              </span>
+              <div>
+                <CardTitle className="text-base font-semibold">Accesos rápidos</CardTitle>
+                <CardDescription className="mt-0.5 text-sm">
+                  Acciones frecuentes de un vistazo.
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-2 pt-4">
+          <CardContent className="space-y-2 pt-5">
             <Button
               asChild
               className="w-full justify-between rounded-xl px-4 py-2.5 text-sm"
@@ -213,10 +287,12 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
       {/* ── Usage + Cancellations ─────────────────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Space usage */}
-        <Card className="rounded-2xl border-border/60 shadow-sm">
+        <Card className="rounded-2xl border-border/60 shadow-sm transition-shadow hover:shadow-md">
           <CardHeader className="border-b border-border/60 pb-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" aria-hidden="true" />
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400" aria-hidden="true">
+                <TrendingUp className="h-4 w-4" />
+              </span>
               <div>
                 <CardTitle className="text-base font-semibold">Uso por espacio</CardTitle>
                 <CardDescription className="mt-0.5 text-sm">
@@ -271,14 +347,21 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
         </Card>
 
         {/* Recent cancellations */}
-        <Card className="rounded-2xl border-border/60 shadow-sm">
+        <Card className="rounded-2xl border-border/60 shadow-sm transition-shadow hover:shadow-md">
           <CardHeader className="border-b border-border/60 pb-4">
-            <CardTitle className="text-base font-semibold">Cancelaciones recientes</CardTitle>
-            <CardDescription className="mt-0.5 text-sm">
-              Últimos movimientos cancelados para detectar huecos operativos.
-            </CardDescription>
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400" aria-hidden="true">
+                <XCircle className="h-4 w-4" />
+              </span>
+              <div>
+                <CardTitle className="text-base font-semibold">Cancelaciones recientes</CardTitle>
+                <CardDescription className="mt-0.5 text-sm">
+                  Últimos movimientos cancelados para detectar huecos operativos.
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="pt-4 space-y-3">
+          <CardContent className="pt-5 space-y-3">
             {data.recentCancellations.length === 0 ? (
               <EmptyState
                 icon={<CalendarClock className="h-5 w-5" />}
