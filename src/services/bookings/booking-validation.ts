@@ -59,18 +59,23 @@ export function assertWithinAvailability({
   }[];
 }) {
   const dayOfWeek = getStudioDateTimeParts(startsAt).dayOfWeek;
-  const rule = availabilityRules.find((item) => item.dayOfWeek === dayOfWeek && item.isActive);
+  const dayRules = availabilityRules.filter(
+    (item) => item.dayOfWeek === dayOfWeek && item.isActive,
+  );
 
-  if (!rule) {
+  if (dayRules.length === 0) {
     throw new Error("El espacio no opera en el dia seleccionado.");
   }
 
   const bookingStart = getStudioMinutesSinceMidnight(startsAt);
   const bookingEnd = getStudioMinutesSinceMidnight(endsAt);
-  const ruleStart = parseTimeToMinutes(rule.startTime);
-  const ruleEnd = parseTimeToMinutes(rule.endTime);
+  const isContained = dayRules.some((rule) => {
+    const ruleStart = parseTimeToMinutes(rule.startTime);
+    const ruleEnd = parseTimeToMinutes(rule.endTime);
+    return bookingStart >= ruleStart && bookingEnd <= ruleEnd;
+  });
 
-  if (bookingStart < ruleStart || bookingEnd > ruleEnd) {
+  if (!isContained) {
     throw new Error("La reserva queda fuera del horario disponible del espacio.");
   }
 }

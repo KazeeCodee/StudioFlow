@@ -89,6 +89,12 @@ describe("rescheduleBooking", () => {
         {
           dayOfWeek: 6,
           startTime: "09:00:00",
+          endTime: "12:00:00",
+          isActive: true,
+        },
+        {
+          dayOfWeek: 6,
+          startTime: "14:00:00",
           endTime: "18:00:00",
           isActive: true,
         },
