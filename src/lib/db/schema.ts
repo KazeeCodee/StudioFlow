@@ -1,6 +1,8 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
+  index,
   integer,
   jsonb,
   numeric,
@@ -132,7 +134,20 @@ export const spaceAvailabilityRules = pgTable("space_availability_rules", {
   startTime: time("start_time").notNull(),
   endTime: time("end_time").notNull(),
   isActive: boolean("is_active").notNull().default(true),
-});
+}, (table) => ({
+  spaceDayIdx: index("space_availability_rules_space_day_idx").on(
+    table.spaceId,
+    table.dayOfWeek,
+  ),
+  weekdayCheck: check(
+    "space_availability_rules_weekday_check",
+    sql`${table.dayOfWeek} between 0 and 6`,
+  ),
+  timeOrderCheck: check(
+    "space_availability_rules_time_order_check",
+    sql`${table.startTime} < ${table.endTime}`,
+  ),
+}));
 
 export const spaceBlocks = pgTable("space_blocks", {
   id: uuid("id").primaryKey().defaultRandom(),
