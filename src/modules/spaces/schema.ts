@@ -10,19 +10,64 @@ export const weekdayOptions = [
   { value: 6, label: "Sábado" },
 ] as const;
 
-const availabilityRuleSchema = z.object({
-  dayOfWeek: z.coerce.number().int().min(0).max(6),
-  isActive: z.boolean().default(false),
-  startTime: z.string().default("09:00"),
-  endTime: z.string().default("18:00"),
+const availabilityTimeSchema = z
+  .string()
+  .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, "Usa un horario HH:mm valido.");
+
+export const availabilityRuleSchema = z
+  .object({
+    dayOfWeek: z.coerce.number().int().min(0).max(6),
+    isActive: z.boolean().default(true),
+    startTime: availabilityTimeSchema,
+    endTime: availabilityTimeSchema,
+  })
+  .refine((rule) => rule.startTime < rule.endTime, {
+    path: ["endTime"],
+    message: "El fin debe ser posterior al inicio.",
+  });
+
+export const availabilityRulesSchema = z.array(availabilityRuleSchema).superRefine((rules, ctx) => {
+  for (const day of weekdayOptions) {
+    const ordered = rules
+      .map((rule, index) => ({ rule, index }))
+      .filter(({ rule }) => rule.isActive && rule.dayOfWeek === day.value)
+      .sort((a, b) => a.rule.startTime.localeCompare(b.rule.startTime));
+
+    for (let index = 1; index < ordered.length; index += 1) {
+      const current = ordered[index];
+      const previous = ordered[index - 1];
+
+      if (current.rule.startTime < previous.rule.endTime) {
+        ctx.addIssue({
+          code: "custom",
+          path: [current.index, "startTime"],
+          message: `${day.label}: los horarios no pueden superponerse.`,
+        });
+      }
+    }
+  }
 });
 
-const defaultAvailabilityRules = weekdayOptions.map((day) => ({
-  dayOfWeek: day.value,
-  isActive: day.value >= 1 && day.value <= 6,
-  startTime: "09:00",
-  endTime: "18:00",
-}));
+export const defaultAvailabilityRules = weekdayOptions
+  .filter((day) => day.value >= 1 && day.value <= 6)
+  .map((day) => ({
+    dayOfWeek: day.value,
+    isActive: true,
+    startTime: "09:00",
+    endTime: "18:00",
+  }));
+
+export function parseAvailabilityRulesField(value: FormDataEntryValue | null) {
+  try {
+    return availabilityRulesSchema.parse(JSON.parse(String(value ?? "[]")));
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw error;
+    }
+
+    throw new Error("La disponibilidad enviada no es valida.");
+  }
+}
 
 export const spaceSchema = z
   .object({
@@ -58,7 +103,7 @@ export const spaceSchema = z
     hourlyQuotaCost: z.coerce.number().int().min(1),
     minBookingHours: z.coerce.number().int().min(1),
     maxBookingHours: z.coerce.number().int().min(1),
-    availabilityRules: z.array(availabilityRuleSchema).length(7).default(defaultAvailabilityRules),
+    availabilityRules: availabilityRulesSchema.default(defaultAvailabilityRules),
   })
   .refine((input) => input.maxBookingHours >= input.minBookingHours, {
     path: ["maxBookingHours"],
