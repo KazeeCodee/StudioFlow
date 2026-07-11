@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { addDays, format, getDay, parse, startOfToday } from "date-fns";
 import { es } from "date-fns/locale";
 import { ArrowRight, CalendarIcon, Clock, Users } from "lucide-react";
@@ -40,6 +40,10 @@ export function SmartBookingForm({ spaceOptions, preselectedSpaceId }: SmartBook
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedStartTime, setSelectedStartTime] = useState<string>("");
   const [durationHours, setDurationHours] = useState<number>(0);
+  const [startTimeOptions, setStartTimeOptions] = useState<string[]>([]);
+  const [isLoadingTimes, setIsLoadingTimes] = useState(false);
+  const [timesError, setTimesError] = useState<string | null>(null);
+  const [availabilityRequestKey, setAvailabilityRequestKey] = useState(0);
 
   const selectedSpace = spaceOptions.find((space) => space.id === selectedSpaceId);
 
@@ -55,22 +59,53 @@ export function SmartBookingForm({ spaceOptions, preselectedSpaceId }: SmartBook
   const today = startOfToday();
   const dateOptions = Array.from({ length: 30 }).map((_, index) => addDays(today, index));
 
-  const startTimeOptions: string[] = [];
-  if (selectedSpace && selectedDate) {
-    const dayOfWeek = getDay(parseSelectedDate(selectedDate));
-    const rule = selectedSpace.availabilityRules.find(
-      (availabilityRule) => availabilityRule.dayOfWeek === dayOfWeek && availabilityRule.isActive,
-    );
+  useEffect(() => {
+    setSelectedStartTime("");
+    setStartTimeOptions([]);
+    setTimesError(null);
 
-    if (rule) {
-      const startHour = parseInt(rule.startTime.split(":")[0] ?? "0", 10);
-      const endHour = parseInt(rule.endTime.split(":")[0] ?? "0", 10);
-
-      for (let hour = startHour; hour < endHour; hour += 1) {
-        startTimeOptions.push(`${hour.toString().padStart(2, "0")}:00`);
-      }
+    if (!selectedSpaceId || !selectedDate || !durationHours) {
+      setIsLoadingTimes(false);
+      return;
     }
-  }
+
+    const controller = new AbortController();
+    const query = new URLSearchParams({
+      date: selectedDate,
+      durationHours: String(durationHours),
+    });
+    setIsLoadingTimes(true);
+
+    void fetch(`/api/member/spaces/${selectedSpaceId}/availability?${query}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("availability request failed");
+        }
+
+        const body = (await response.json()) as { startTimes?: unknown };
+        if (!Array.isArray(body.startTimes) || !body.startTimes.every((time) => typeof time === "string")) {
+          throw new Error("invalid availability response");
+        }
+
+        setStartTimeOptions(body.startTimes);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        setTimesError("No pudimos consultar los horarios disponibles.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsLoadingTimes(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [availabilityRequestKey, durationHours, selectedDate, selectedSpaceId]);
 
   const quotaCost = selectedSpace && durationHours ? selectedSpace.hourlyQuotaCost * durationHours : 0;
 
@@ -86,12 +121,14 @@ export function SmartBookingForm({ spaceOptions, preselectedSpaceId }: SmartBook
   }
 
   return (
-    <Card className="rounded-3xl overflow-hidden border-border/70 shadow-sm">
+    <Card className="overflow-hidden rounded-xl border-border/70 shadow-sm">
       <div className="grid md:grid-cols-[1fr_320px]">
         <div className="space-y-8 p-6 md:p-8">
           <div>
             <h3 className="text-xl font-semibold tracking-tight">Detalles de tu reserva</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Elegi el espacio, fecha y horario.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Elegí el espacio, la fecha y la duración para consultar horarios reales.
+            </p>
           </div>
 
           <form action={createMemberBookingAction} className="space-y-6">
@@ -181,30 +218,8 @@ export function SmartBookingForm({ spaceOptions, preselectedSpaceId }: SmartBook
             {selectedSpace && selectedDate && (
               <div className="animate-in grid gap-5 fade-in slide-in-from-top-2 sm:grid-cols-2">
                 <div className="space-y-3">
-                  <Label htmlFor="startTime" className="text-sm font-semibold">
-                    3. Horario de inicio
-                  </Label>
-                  <select
-                    id="startTime"
-                    className="w-full appearance-none rounded-xl border border-input bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    value={selectedStartTime}
-                    onChange={(event) => setSelectedStartTime(event.target.value)}
-                    required
-                  >
-                    <option value="" disabled>
-                      Seleccionar hora
-                    </option>
-                    {startTimeOptions.map((time) => (
-                      <option key={time} value={time}>
-                        {time}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-3">
                   <Label htmlFor="duration" className="text-sm font-semibold">
-                    4. Duracion (horas)
+                    3. Duración (horas)
                   </Label>
                   <select
                     id="duration"
@@ -214,7 +229,7 @@ export function SmartBookingForm({ spaceOptions, preselectedSpaceId }: SmartBook
                     required
                   >
                     <option value="" disabled>
-                      Seleccionar duracion
+                      Seleccionar duración
                     </option>
                     {Array.from({
                       length: selectedSpace.maxBookingHours - selectedSpace.minBookingHours + 1,
@@ -227,6 +242,49 @@ export function SmartBookingForm({ spaceOptions, preselectedSpaceId }: SmartBook
                       );
                     })}
                   </select>
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="startTime" className="text-sm font-semibold">
+                    4. Horario de inicio
+                  </Label>
+                  <select
+                    id="startTime"
+                    className="w-full appearance-none rounded-xl border border-input bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-60"
+                    value={selectedStartTime}
+                    onChange={(event) => setSelectedStartTime(event.target.value)}
+                    disabled={!durationHours || isLoadingTimes || Boolean(timesError) || startTimeOptions.length === 0}
+                    required
+                  >
+                    <option value="" disabled>
+                      {isLoadingTimes ? "Consultando horarios..." : "Seleccionar hora"}
+                    </option>
+                    {startTimeOptions.map((time) => (
+                      <option key={time} value={time}>
+                        {time}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div aria-live="polite" className="min-h-5 text-xs text-muted-foreground">
+                    {isLoadingTimes ? <p>Consultando horarios disponibles...</p> : null}
+                    {!isLoadingTimes && durationHours > 0 && !timesError && startTimeOptions.length === 0 ? (
+                      <p>No quedan horarios disponibles para esta fecha y duración.</p>
+                    ) : null}
+                    {timesError ? (
+                      <div className="flex flex-wrap items-center gap-2 text-destructive">
+                        <p>{timesError}</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAvailabilityRequestKey((current) => current + 1)}
+                        >
+                          Reintentar
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             )}
@@ -242,7 +300,7 @@ export function SmartBookingForm({ spaceOptions, preselectedSpaceId }: SmartBook
                 </Button>
                 <p className="mt-3 flex items-center text-xs text-muted-foreground">
                   <Clock className="mr-1.5 h-3.5 w-3.5" />
-                  El sistema verificara que este horario exacto no este ocupado por otra persona.
+                  Este horario está disponible ahora; se validará nuevamente al confirmar.
                 </p>
               </div>
             )}
