@@ -1,6 +1,6 @@
 import { createSpaceAction } from "@/modules/spaces/actions";
-import { weekdayOptions } from "@/modules/spaces/schema";
 import { SpaceMediaManager } from "@/components/spaces/space-media-manager";
+import { WeeklyAvailabilityEditor } from "@/components/forms/weekly-availability-editor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,17 +35,6 @@ type SpaceFormProps = {
   defaultValues?: SpaceFormValues;
   children?: React.ReactNode;
 };
-
-function getAvailabilityRule(defaultValues: SpaceFormValues | undefined, dayOfWeek: number) {
-  return (
-    defaultValues?.availabilityRules?.find((rule) => rule.dayOfWeek === dayOfWeek) ?? {
-      dayOfWeek,
-      isActive: dayOfWeek >= 1 && dayOfWeek <= 6,
-      startTime: "09:00",
-      endTime: "18:00",
-    }
-  );
-}
 
 export function SpaceForm({
   action = createSpaceAction,
@@ -184,62 +173,12 @@ export function SpaceForm({
             <div>
               <p className="text-sm font-semibold text-foreground">Disponibilidad semanal</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Definí los rangos base habilitados para reservas. Después podés agregar bloqueos
-                puntuales.
+                Definí uno o varios rangos por día para representar horarios partidos y pausas.
+                Después podés agregar bloqueos puntuales.
               </p>
             </div>
 
-            <div className="grid gap-3">
-              {weekdayOptions.map((day) => {
-                const availabilityRule = getAvailabilityRule(defaultValues, day.value);
-                return (
-                  <div
-                    key={day.value}
-                    className="grid gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 md:grid-cols-[160px_100px_1fr_1fr]"
-                  >
-                    <label className="flex items-center gap-3 text-sm font-medium">
-                      <input
-                        className="h-4 w-4 rounded border-border accent-primary"
-                        type="checkbox"
-                        name={`availability-${day.value}-enabled`}
-                        defaultChecked={availabilityRule.isActive}
-                      />
-                      {day.label}
-                    </label>
-
-                    <div className="text-xs text-muted-foreground md:self-center">
-                      Día {day.value}
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label htmlFor={`availability-${day.value}-start`} className="text-xs">
-                        Desde
-                      </Label>
-                      <Input
-                        id={`availability-${day.value}-start`}
-                        name={`availability-${day.value}-start`}
-                        type="time"
-                        defaultValue={availabilityRule.startTime.slice(0, 5)}
-                        className="h-9"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label htmlFor={`availability-${day.value}-end`} className="text-xs">
-                        Hasta
-                      </Label>
-                      <Input
-                        id={`availability-${day.value}-end`}
-                        name={`availability-${day.value}-end`}
-                        type="time"
-                        defaultValue={availabilityRule.endTime.slice(0, 5)}
-                        className="h-9"
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <WeeklyAvailabilityEditor initialRules={defaultValues?.availabilityRules} />
           </section>
 
           <Button type="submit" className="w-full sm:w-auto">

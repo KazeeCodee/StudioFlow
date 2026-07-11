@@ -20,4 +20,25 @@ describe("SpaceForm", () => {
     expect(screen.getByLabelText(/eliminar imagen actual/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/imagen principal/i)).not.toBeInTheDocument();
   });
+
+  it("muestra todos los rangos existentes del mismo dia al editar", () => {
+    render(
+      <SpaceForm
+        defaultValues={{
+          name: "Sala Podcast",
+          hourlyQuotaCost: 2,
+          minBookingHours: 1,
+          maxBookingHours: 4,
+          availabilityRules: [
+            { dayOfWeek: 1, isActive: true, startTime: "08:00:00", endTime: "12:00:00" },
+            { dayOfWeek: 1, isActive: true, startTime: "14:00:00", endTime: "22:00:00" },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getAllByTestId("availability-range-1")).toHaveLength(2);
+    expect(screen.getByDisplayValue("08:00")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("14:00")).toBeInTheDocument();
+  });
 });
