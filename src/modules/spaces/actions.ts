@@ -10,18 +10,13 @@ import { canManageSpaces } from "@/lib/permissions/guards";
 import { slugify } from "@/lib/utils";
 import { requireStaffContext } from "@/modules/auth/queries";
 import type { AppRole } from "@/modules/auth/types";
-import { spaceBlockSchema, spaceSchema } from "@/modules/spaces/schema";
+import {
+  parseAvailabilityRulesField,
+  spaceBlockSchema,
+  spaceSchema,
+} from "@/modules/spaces/schema";
 import { buildSpaceWriteValues } from "@/services/spaces/build-space-write-values";
 import { resolveSpaceImageUrl } from "@/services/spaces/resolve-space-image";
-
-function readAvailabilityRules(formData: FormData) {
-  return Array.from({ length: 7 }, (_, dayOfWeek) => ({
-    dayOfWeek,
-    isActive: formData.get(`availability-${dayOfWeek}-enabled`) === "on",
-    startTime: String(formData.get(`availability-${dayOfWeek}-start`) ?? "09:00"),
-    endTime: String(formData.get(`availability-${dayOfWeek}-end`) ?? "18:00"),
-  }));
-}
 
 function readStringArray(formData: FormData, key: string): string[] {
   return formData.getAll(key).map(String).filter(Boolean);
@@ -53,6 +48,9 @@ export async function createSpaceAction(formData: FormData) {
     removeImage: false,
     slug,
   });
+  const availabilityRules = parseAvailabilityRulesField(formData.get("availabilityRules")).filter(
+    (rule) => rule.isActive,
+  );
   const input = spaceSchema.parse({
     name,
     slug,
@@ -65,37 +63,41 @@ export async function createSpaceAction(formData: FormData) {
     hourlyQuotaCost: formData.get("hourlyQuotaCost"),
     minBookingHours: formData.get("minBookingHours"),
     maxBookingHours: formData.get("maxBookingHours"),
-    availabilityRules: readAvailabilityRules(formData),
+    availabilityRules,
   });
 
   const db = getDb();
   const values = buildSpaceWriteValues(input);
 
-  const [space] = await db
-    .insert(spaces)
-    .values(values)
-    .returning({ id: spaces.id, name: spaces.name, slug: spaces.slug });
+  await db.transaction(async (tx) => {
+    const [space] = await tx
+      .insert(spaces)
+      .values(values)
+      .returning({ id: spaces.id, name: spaces.name, slug: spaces.slug });
 
-  await db.insert(spaceAvailabilityRules).values(
-    input.availabilityRules.map((rule) => ({
-      spaceId: space.id,
-      dayOfWeek: rule.dayOfWeek,
-      startTime: rule.startTime,
-      endTime: rule.endTime,
-      isActive: rule.isActive,
-    })),
-  );
+    if (input.availabilityRules.length > 0) {
+      await tx.insert(spaceAvailabilityRules).values(
+        input.availabilityRules.map((rule) => ({
+          spaceId: space.id,
+          dayOfWeek: rule.dayOfWeek,
+          startTime: rule.startTime,
+          endTime: rule.endTime,
+          isActive: true,
+        })),
+      );
+    }
 
-  await db.insert(auditLogs).values({
-    actorId: profile.id,
-    actorRole: profile.role,
-    action: "space.created",
-    entityType: "space",
-    entityId: space.id,
-    metadata: {
-      name: space.name,
-      slug: space.slug,
-    },
+    await tx.insert(auditLogs).values({
+      actorId: profile.id,
+      actorRole: profile.role,
+      action: "space.created",
+      entityType: "space",
+      entityId: space.id,
+      metadata: {
+        name: space.name,
+        slug: space.slug,
+      },
+    });
   });
 
   revalidateSpacePaths();
@@ -113,6 +115,9 @@ export async function updateSpaceAction(formData: FormData) {
     removeImage: formData.get("removeImage") === "on",
     slug,
   });
+  const availabilityRules = parseAvailabilityRulesField(formData.get("availabilityRules")).filter(
+    (rule) => rule.isActive,
+  );
   const input = spaceSchema.parse({
     name,
     slug,
@@ -125,7 +130,7 @@ export async function updateSpaceAction(formData: FormData) {
     hourlyQuotaCost: formData.get("hourlyQuotaCost"),
     minBookingHours: formData.get("minBookingHours"),
     maxBookingHours: formData.get("maxBookingHours"),
-    availabilityRules: readAvailabilityRules(formData),
+    availabilityRules,
   });
 
   if (!spaceId) {
@@ -147,15 +152,17 @@ export async function updateSpaceAction(formData: FormData) {
 
     await tx.delete(spaceAvailabilityRules).where(eq(spaceAvailabilityRules.spaceId, spaceId));
 
-    await tx.insert(spaceAvailabilityRules).values(
-      input.availabilityRules.map((rule) => ({
-        spaceId,
-        dayOfWeek: rule.dayOfWeek,
-        startTime: rule.startTime,
-        endTime: rule.endTime,
-        isActive: rule.isActive,
-      })),
-    );
+    if (input.availabilityRules.length > 0) {
+      await tx.insert(spaceAvailabilityRules).values(
+        input.availabilityRules.map((rule) => ({
+          spaceId,
+          dayOfWeek: rule.dayOfWeek,
+          startTime: rule.startTime,
+          endTime: rule.endTime,
+          isActive: true,
+        })),
+      );
+    }
 
     await tx.insert(auditLogs).values({
       actorId: profile.id,
