@@ -175,6 +175,28 @@ export function getFutureStudioSlot({
   };
 }
 
+export function getFutureStudioDateForWeekday({
+  dayOfWeek,
+  minDaysFromNow = 1,
+}: {
+  dayOfWeek: number;
+  minDaysFromNow?: number;
+}) {
+  for (let dayOffset = minDaysFromNow; dayOffset < minDaysFromNow + 7; dayOffset += 1) {
+    const anchor = new Date();
+    anchor.setDate(anchor.getDate() + dayOffset);
+    const parts = getStudioDateTimeParts(anchor);
+
+    if (parts.dayOfWeek === dayOfWeek) {
+      return `${parts.year.toString().padStart(4, "0")}-${parts.month
+        .toString()
+        .padStart(2, "0")}-${parts.day.toString().padStart(2, "0")}`;
+    }
+  }
+
+  throw new Error(`No se pudo calcular el proximo dia ${dayOfWeek}.`);
+}
+
 export class StudioFlowTestKit {
   readonly prefix: string;
 
@@ -305,10 +327,16 @@ export class StudioFlowTestKit {
     hourlyQuotaCost = 2,
     minBookingHours = 1,
     maxBookingHours = 4,
+    availabilityRules,
   }: {
     hourlyQuotaCost?: number;
     minBookingHours?: number;
     maxBookingHours?: number;
+    availabilityRules?: Array<{
+      dayOfWeek: number;
+      startTime: string;
+      endTime: string;
+    }>;
   } = {}) {
     const slug = `${this.prefix}-space`;
     const name = `${this.prefix} Space`;
@@ -336,10 +364,16 @@ export class StudioFlowTestKit {
 
     this.trackedSpaceIds.add(space.id);
 
-    for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek += 1) {
+    const rules = availabilityRules ?? Array.from({ length: 7 }, (_, dayOfWeek) => ({
+      dayOfWeek,
+      startTime: "08:00",
+      endTime: "22:00",
+    }));
+
+    for (const rule of rules) {
       await this.sql`
         insert into space_availability_rules (space_id, day_of_week, start_time, end_time, is_active)
-        values (${space.id}, ${dayOfWeek}, '08:00', '22:00', true)
+        values (${space.id}, ${rule.dayOfWeek}, ${rule.startTime}, ${rule.endTime}, true)
       `;
     }
 

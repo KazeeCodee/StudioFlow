@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   createStudioFlowTestKit,
+  getFutureStudioDateForWeekday,
   getFutureStudioSlot,
 } from "./support/studioflow-testkit";
 
@@ -54,8 +55,11 @@ test("miembro reserva un espacio y consume cupos", async ({ page }, testInfo) =>
     await page.goto("/member/bookings/new");
     await page.locator("#spaceId").selectOption(space.id);
     await page.locator("#date").selectOption(slot.startsAtInput.slice(0, 10));
-    await page.locator("#startTime").selectOption(slot.startsAtInput.slice(11, 16));
     await page.locator("#duration").selectOption("2");
+    await expect(
+      page.locator("#startTime").locator(`option[value="${slot.startsAtInput.slice(11, 16)}"]`),
+    ).toBeAttached();
+    await page.locator("#startTime").selectOption(slot.startsAtInput.slice(11, 16));
     await page.getByRole("button", { name: /confirmar.*reserva/i }).click();
     await expect(page).toHaveURL(/\/member\/bookings(?:\/|$)/, {
       timeout: 20_000,
@@ -81,6 +85,43 @@ test("miembro reserva un espacio y consume cupos", async ({ page }, testInfo) =>
     await expect(page.getByRole("cell", { name: "confirmed" })).toBeVisible({
       timeout: 20_000,
     });
+  } finally {
+    await kit.cleanup();
+  }
+});
+
+test("miembro reserva dentro del segundo de dos rangos separados", async ({ page }, testInfo) => {
+  const kit = await createStudioFlowTestKit(testInfo);
+
+  try {
+    const plan = await kit.createPlan({ quotaAmount: 10 });
+    const space = await kit.createSpace({
+      hourlyQuotaCost: 2,
+      availabilityRules: [
+        { dayOfWeek: 1, startTime: "08:00", endTime: "12:00" },
+        { dayOfWeek: 1, startTime: "14:00", endTime: "22:00" },
+      ],
+    });
+    const member = await kit.createMember({ planId: plan.id, quotaTotal: 10 });
+    const monday = getFutureStudioDateForWeekday({ dayOfWeek: 1, minDaysFromNow: 3 });
+
+    await kit.login(page, member.email, member.password);
+    await page.goto("/member/bookings/new");
+    await page.locator("#spaceId").selectOption(space.id);
+    await page.locator("#date").selectOption(monday);
+    await page.locator("#duration").selectOption("2");
+
+    const startTime = page.locator("#startTime");
+    await expect(startTime.locator('option[value="10:00"]')).toBeAttached();
+    await expect(startTime.locator('option[value="14:00"]')).toBeAttached();
+    for (const unavailable of ["11:00", "12:00", "13:00", "21:00"]) {
+      await expect(startTime.locator(`option[value="${unavailable}"]`)).toHaveCount(0);
+    }
+
+    await startTime.selectOption("14:00");
+    await page.getByRole("button", { name: /confirmar.*reserva/i }).click();
+    await expect(page).toHaveURL(/\/member\/bookings(?:\/|$)/, { timeout: 20_000 });
+    await expect.poll(async () => (await kit.getMemberPlan(member.memberPlanId))?.quotaRemaining).toBe(6);
   } finally {
     await kit.cleanup();
   }
