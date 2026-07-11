@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, inArray, lt, ne } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { formatStudioDateTime } from "@/lib/datetime";
+import { formatStudioDateTime, parseStudioDateTimeInput } from "@/lib/datetime";
 import { getDb } from "@/lib/db";
 import {
   auditLogs,
@@ -14,8 +14,12 @@ import {
   spaceBlocks,
   spaces,
 } from "@/lib/db/schema";
+import { getOperationalSettings } from "@/modules/settings/queries";
+import { generateAvailableStartTimes } from "@/services/bookings/generate-available-start-times";
 
 const activeBookingStatuses = ["pending", "confirmed"] as const;
+
+export class BookingAvailabilityNotFoundError extends Error {}
 
 function formatStatusLabel(status: string) {
   switch (status) {
@@ -244,6 +248,54 @@ export async function getSpaceBookingContext(spaceId: string) {
     ...space,
     availabilityRules,
   };
+}
+
+function getNextCalendarDate(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  const nextDate = new Date(Date.UTC(year, month - 1, day + 1));
+  return nextDate.toISOString().slice(0, 10);
+}
+
+export async function getAvailableStartTimesForSpace({
+  spaceId,
+  date,
+  durationHours,
+}: {
+  spaceId: string;
+  date: string;
+  durationHours: number;
+}) {
+  const [space, settings] = await Promise.all([
+    getSpaceBookingContext(spaceId),
+    getOperationalSettings(),
+  ]);
+
+  if (!space || space.status !== "active") {
+    throw new BookingAvailabilityNotFoundError("El espacio no esta disponible para reservas.");
+  }
+
+  if (durationHours < space.minBookingHours || durationHours > space.maxBookingHours) {
+    throw new Error("La duracion no respeta los limites del espacio.");
+  }
+
+  const dayStartsAt = parseStudioDateTimeInput(`${date}T00:00`);
+  const nextDayStartsAt = parseStudioDateTimeInput(`${getNextCalendarDate(date)}T00:00`);
+  const bufferMilliseconds = settings.bookingBufferHours * 3_600_000;
+  const bookingSearchStartsAt = new Date(dayStartsAt.getTime() - bufferMilliseconds);
+  const bookingSearchEndsAt = new Date(nextDayStartsAt.getTime() + bufferMilliseconds);
+  const [blocks, activeBookings] = await Promise.all([
+    getOverlappingSpaceBlocks(spaceId, dayStartsAt, nextDayStartsAt),
+    getOverlappingBookings(spaceId, bookingSearchStartsAt, bookingSearchEndsAt),
+  ]);
+
+  return generateAvailableStartTimes({
+    date,
+    durationHours,
+    availabilityRules: space.availabilityRules,
+    blocks,
+    bookings: activeBookings,
+    bookingBufferHours: settings.bookingBufferHours,
+  });
 }
 
 export async function getOverlappingSpaceBlocks(spaceId: string, startsAt: Date, endsAt: Date) {

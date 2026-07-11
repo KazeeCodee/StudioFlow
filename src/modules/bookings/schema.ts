@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+export const bookingAvailabilityQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  durationHours: z.coerce.number().int().min(1),
+});
+
 export const bookingSchema = z
   .object({
     memberId: z.string().uuid().optional(),
