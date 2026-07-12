@@ -60,12 +60,7 @@ export function SmartBookingForm({ spaceOptions, preselectedSpaceId }: SmartBook
   const dateOptions = Array.from({ length: 30 }).map((_, index) => addDays(today, index));
 
   useEffect(() => {
-    setSelectedStartTime("");
-    setStartTimeOptions([]);
-    setTimesError(null);
-
     if (!selectedSpaceId || !selectedDate || !durationHours) {
-      setIsLoadingTimes(false);
       return;
     }
 
@@ -74,7 +69,6 @@ export function SmartBookingForm({ spaceOptions, preselectedSpaceId }: SmartBook
       date: selectedDate,
       durationHours: String(durationHours),
     });
-    setIsLoadingTimes(true);
 
     void fetch(`/api/member/spaces/${selectedSpaceId}/availability?${query}`, {
       signal: controller.signal,
@@ -150,6 +144,9 @@ export function SmartBookingForm({ spaceOptions, preselectedSpaceId }: SmartBook
                     setSelectedDate("");
                     setSelectedStartTime("");
                     setDurationHours(0);
+                    setStartTimeOptions([]);
+                    setTimesError(null);
+                    setIsLoadingTimes(false);
                   }}
                   required
                 >
@@ -181,6 +178,9 @@ export function SmartBookingForm({ spaceOptions, preselectedSpaceId }: SmartBook
                     onChange={(event) => {
                       setSelectedDate(event.target.value);
                       setSelectedStartTime("");
+                      setStartTimeOptions([]);
+                      setTimesError(null);
+                      setIsLoadingTimes(durationHours > 0);
                     }}
                     required
                   >
@@ -225,7 +225,14 @@ export function SmartBookingForm({ spaceOptions, preselectedSpaceId }: SmartBook
                     id="duration"
                     className="w-full appearance-none rounded-xl border border-input bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                     value={durationHours || ""}
-                    onChange={(event) => setDurationHours(parseInt(event.target.value, 10))}
+                    onChange={(event) => {
+                      const nextDuration = parseInt(event.target.value, 10);
+                      setDurationHours(nextDuration);
+                      setSelectedStartTime("");
+                      setStartTimeOptions([]);
+                      setTimesError(null);
+                      setIsLoadingTimes(true);
+                    }}
                     required
                   >
                     <option value="" disabled>
@@ -278,7 +285,12 @@ export function SmartBookingForm({ spaceOptions, preselectedSpaceId }: SmartBook
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => setAvailabilityRequestKey((current) => current + 1)}
+                          onClick={() => {
+                            setStartTimeOptions([]);
+                            setTimesError(null);
+                            setIsLoadingTimes(true);
+                            setAvailabilityRequestKey((current) => current + 1);
+                          }}
                         >
                           Reintentar
                         </Button>

@@ -95,7 +95,12 @@ export function WeeklyAvailabilityEditor({ initialRules }: WeeklyAvailabilityEdi
   const serializedRules = useMemo(
     () =>
       rules
-        .map(({ key: _key, ...rule }) => rule)
+        .map((rule) => ({
+          dayOfWeek: rule.dayOfWeek,
+          isActive: rule.isActive,
+          startTime: rule.startTime,
+          endTime: rule.endTime,
+        }))
         .sort(
           (first, second) =>
             first.dayOfWeek - second.dayOfWeek || first.startTime.localeCompare(second.startTime),
