@@ -29,4 +29,13 @@ describe("schema", () => {
       ]),
     );
   });
+
+  it("declara las restricciones de ventanas y cuotas", () => {
+    expect(getTableConfig(bookings).checks.map((check) => check.name)).toContain(
+      "bookings_valid_window",
+    );
+    expect(
+      getTableConfig(memberPlans).checks.map((check) => check.name),
+    ).toContain("member_plans_valid_quota");
+  });
 });

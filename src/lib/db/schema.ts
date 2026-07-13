@@ -213,7 +213,15 @@ export const memberPlans = pgTable("member_plans", {
     onDelete: "set null",
   }),
   ...timestamps,
-});
+}, (table) => ({
+  validQuotaCheck: check(
+    "member_plans_valid_quota",
+    sql`${table.quotaTotal} >= 0
+      and ${table.quotaUsed} >= 0
+      and ${table.quotaRemaining} >= 0
+      and ${table.quotaUsed} + ${table.quotaRemaining} = ${table.quotaTotal}`,
+  ),
+}));
 
 export const bookings = pgTable("bookings", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -241,7 +249,12 @@ export const bookings = pgTable("bookings", {
     onDelete: "set null",
   }),
   ...timestamps,
-});
+}, (table) => ({
+  validWindowCheck: check(
+    "bookings_valid_window",
+    sql`${table.endsAt} > ${table.startsAt}`,
+  ),
+}));
 
 export const bookingStatusHistory = pgTable("booking_status_history", {
   id: uuid("id").primaryKey().defaultRandom(),
