@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { logger } from "@/lib/logger";
 import { requireAuthenticatedContext, requireMemberContext, requireStaffContext } from "@/modules/auth/queries";
 import { bookingSchema, cancellationSchema, rescheduleSchema } from "@/modules/bookings/schema";
 import { cancelBooking } from "@/services/bookings/cancel-booking";
@@ -17,7 +18,9 @@ async function notifySafely(task: () => Promise<void>) {
   try {
     await task();
   } catch (error) {
-    console.error("Notification delivery failed", error);
+    logger.error("notification_delivery_failed", {
+      errorType: error instanceof Error ? error.name : "unknown",
+    });
   }
 }
 

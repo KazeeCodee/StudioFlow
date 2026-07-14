@@ -11,8 +11,14 @@ const allowedSpaceImageMimeTypes = new Set([
   "image/png",
   "image/gif",
   "image/webp",
-  "image/svg+xml",
 ]);
+const allowedExtensionsByMimeType: Record<string, ReadonlySet<string>> = {
+  "image/jpeg": new Set(["jpg", "jpeg"]),
+  "image/jpg": new Set(["jpg", "jpeg"]),
+  "image/png": new Set(["png"]),
+  "image/gif": new Set(["gif"]),
+  "image/webp": new Set(["webp"]),
+};
 
 type UploadedImageFile = File | null;
 
@@ -27,7 +33,11 @@ type ResolveSpaceImageUrlInput = {
 };
 
 function isUploadedFile(file: UploadedImageFile): file is File {
-  return Boolean(file && typeof file.arrayBuffer === "function" && file.size > 0);
+  return Boolean(
+    file &&
+      typeof file.arrayBuffer === "function" &&
+      (file.size > 0 || file.name.length > 0),
+  );
 }
 
 function normalizeUploadedFileName(fileName: string) {
@@ -63,11 +73,21 @@ async function removeUploadedObject(
 
 function assertValidSpaceImage(file: File) {
   if (!allowedSpaceImageMimeTypes.has(file.type)) {
-    throw new Error("La imagen debe ser JPG, PNG, GIF, WEBP o SVG.");
+    throw new Error("La imagen debe ser JPG, PNG, GIF o WEBP.");
+  }
+
+  if (file.size === 0) {
+    throw new Error("La imagen no puede estar vacia.");
   }
 
   if (file.size > MAX_SPACE_IMAGE_SIZE_BYTES) {
     throw new Error("La imagen no puede superar los 5 MB.");
+  }
+
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+
+  if (!allowedExtensionsByMimeType[file.type]?.has(extension)) {
+    throw new Error("La extension de la imagen no coincide con su tipo MIME.");
   }
 }
 

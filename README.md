@@ -42,6 +42,7 @@ Variables mínimas:
 Variables operativas:
 
 - `APP_URL`
+- `CSP_REPORT_ONLY` (`true` en staging durante el ajuste de la política; `false` en producción)
 - `CRON_SECRET`
 - `DATABASE_POOL_MAX`
 - `EMAIL_TRANSPORT_MODE`
@@ -77,8 +78,15 @@ Notas:
 - `0002` habilita RLS y políticas mínimas para staff/member.
 - `0003` crea el bucket público `uploads` para imágenes.
 - `0004` agrega galería de imágenes y videos de YouTube a `spaces`.
+- El bucket `uploads` acepta solamente JPG/JPEG, PNG, GIF y WebP de hasta 5 MB.
+- Antes de endurecer un bucket existente, listá y exportá cualquier SVG. Las copias de la base de datos no restauran objetos eliminados de Storage.
 
 Si usás Supabase CLI o un pipeline propio, podés ejecutar esas migraciones con tu flujo habitual. Si no, podés correrlas desde el SQL Editor de Supabase.
+
+Runbooks operativos antes de tocar staging o producción:
+
+- [Supabase: preparación de producción](docs/runbooks/supabase-production.md)
+- [Backup, restore y rotación](docs/runbooks/backup-restore.md)
 
 ## Bootstrap del primer admin
 
@@ -111,10 +119,15 @@ npm run dev
 
 ## Deploy en Railway
 
-El repo incluye configuracion para Railway/Nixpacks:
+El repo incluye configuracion como codigo para dos servicios Railway:
 
-- `nixpacks.toml` fuerza `npm ci`, `npm run build` y `npm run start`
+- `railway.toml`: servicio web persistente, healthcheck `/api/health/ready` y timeout de 300 segundos
+- `railway.cron.toml`: cron diario `0 12 * * *` UTC que ejecuta `scripts/run-notifications-cron.mjs` y termina
+- `nixpacks.toml`: compatibilidad con deployments existentes; los servicios nuevos usan Railpack
 - `.nvmrc` y `package.json` fijan Node 20
+- el build standalone copia `public` y `.next/static` dentro de `.next/standalone`
+
+En Railway, el servicio web usa el archivo por defecto `/railway.toml`. El servicio cron debe apuntar su Config File Path a `/railway.cron.toml`. Mantené una sola replica web para el primer release y no asignes un dominio publico al servicio cron.
 
 Variables minimas a cargar en Railway:
 
@@ -127,11 +140,26 @@ Variables minimas a cargar en Railway:
 
 Variables recomendadas:
 
-- `DATABASE_POOL_MAX=1`
+- `DATABASE_POOL_MAX=5` como punto de partida; validalo contra el limite de conexiones del proyecto Supabase
 - `EMAIL_TRANSPORT_MODE`
 - `EMAIL_FROM`
 - `RESEND_API_KEY`
 - `USE_NEXT_RSPACK=false`
+
+Para el runtime web, copiá desde Supabase el connection string de **Shared Pooler / Session mode** (puerto `5432`) y exigí SSL. La forma esperada es:
+
+```text
+postgresql://postgres.<project-ref>:<password>@aws-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+Usá una conexion directa separada para migraciones. Nunca guardes ninguno de esos valores en Git.
+
+Checklist del dashboard antes de verificar staging:
+
+- web: una replica, Config File Path `/railway.toml`, variables completas y dominio HTTPS
+- cron: Config File Path `/railway.cron.toml`, mismo `APP_URL`/`CRON_SECRET` que el web y sin dominio publico
+- confirmar que una ejecucion manual del cron termina y deja un resumen JSON
+- conservar `vercel.json` hasta demostrar paridad en Railway staging; recien entonces eliminarlo
 
 ## Checks de calidad
 
@@ -141,6 +169,43 @@ npm test
 npm run test:e2e
 npm run build
 ```
+
+### E2E aislado contra staging
+
+Los E2E con mutaciones no leen `.env.local` y nunca deben apuntar a produccion:
+
+```bash
+cp .env.e2e.example .env.e2e.local
+```
+
+Completá las credenciales del proyecto **staging**, indicá el project ref real de produccion solamente como guarda y cambiá `E2E_ALLOW_MUTATIONS=true` justo antes de una corrida intencional. El loader exige que la URL de Supabase y `DATABASE_URL` pertenezcan al ref staging esperado y aborta si detecta el ref de produccion.
+
+```bash
+npm run test:e2e
+```
+
+Cada spec limpia sus usuarios/registros en `finally` y cierra su cliente SQL. Si falta `.env.e2e.local`, el opt-in o una referencia no coincide, Playwright aborta antes de iniciar el servidor.
+
+### CI y gates de release
+
+El workflow `CI` ejecuta con Node 20: instalacion reproducible, auditoria de dependencias de produccion, lint, unitarios, integracion sobre Supabase local, cobertura y build. El baseline medido el 2026-07-14 es:
+
+| Metrica | Baseline / umbral |
+| --- | ---: |
+| Statements | 56.61% |
+| Branches | 51.64% |
+| Functions | 61.41% |
+| Lines | 56.48% |
+
+Los umbrales no deben reducirse. `Staging E2E` usa el GitHub Environment `staging`, secretos exclusivos de staging y una concurrency group unica para impedir dos suites mutando el mismo proyecto a la vez.
+
+Configura un ruleset para `master` con pull request obligatorio, al menos una aprobacion, conversaciones resueltas, branch actualizado, bloqueo de force-push/delete y estos status checks requeridos:
+
+- `CI / quality`
+- `CI / database`
+- `Staging E2E / e2e`
+
+No permitas pushes directos. Railway production debe mantener autodeploy deshabilitado y promocion manual hasta registrar dos releases exitosos con todos los gates.
 
 ## Notificaciones
 
@@ -158,12 +223,30 @@ El cron está expuesto en `GET /api/cron/notifications` y requiere:
 
 - header `Authorization: Bearer <CRON_SECRET>`
 
+## Conciliación de renovaciones
+
+El panel `/admin/renewals` funciona como una cola operativa única:
+
+- `Pendientes` incluye planes vencidos y próximos dentro de la ventana configurada.
+- `Todos los planes` permite consultar renovaciones anticipadas fuera de esa ventana.
+- `Historial` muestra eventos reales con operador, fechas, cupos y evidencia de pago.
+
+Para confirmar una renovación el administrador debe registrar importe en ARS, método,
+fecha de pago y verificación explícita. Transferencias y tarjetas también requieren una
+referencia externa. La operación bloquea el plan, valida su vencimiento esperado y guarda
+la evidencia junto con la auditoría antes de reiniciar los cupos.
+
+Si el correo de confirmación falla, la renovación permanece aplicada y la interfaz informa
+el fallo para que el equipo pueda contactar al miembro o reintentar la notificación. Una
+corrección posterior debe realizarse desde el flujo administrativo correspondiente; no se
+deben editar manualmente `member_plans` o `renewals` sin dejar un registro de auditoría.
+
 ## Flujos principales cubiertos
 
 - alta de miembro desde admin
 - reserva de espacio desde portal miembro
 - cancelación con reintegro según política
-- renovación manual desde admin
+- conciliación de pago y renovación manual desde una cola administrativa
 - gestión de planes, espacios y usuarios internos
 
 ## Estado actual de release

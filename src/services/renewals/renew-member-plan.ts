@@ -1,7 +1,26 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { auditLogs, memberPlans, plans, renewals } from "@/lib/db/schema";
+import {
+  auditLogs,
+  memberPlans,
+  members,
+  plans,
+  renewals,
+} from "@/lib/db/schema";
 import type { AuthenticatedProfile } from "@/modules/auth/types";
+import { calculateRenewalEndDate } from "@/modules/renewals/calendar";
+import { RenewalConflictError } from "@/services/renewals/errors";
+
+export type RenewMemberPlanInput = {
+  memberPlanId: string;
+  expectedNextPaymentDueAt: Date;
+  amountReceived: number;
+  currency: "ARS";
+  paymentMethod: "bank_transfer" | "cash" | "card" | "other";
+  paidAt: Date;
+  externalReference?: string;
+  notes?: string;
+};
 
 export function buildRenewalSnapshot({
   oldQuotaRemaining,
@@ -18,77 +37,64 @@ export function buildRenewalSnapshot({
   };
 }
 
-function addPlanDuration({
-  anchorDate,
-  durationType,
-  durationValue,
-}: {
-  anchorDate: Date;
-  durationType: "weekly" | "monthly" | "custom";
-  durationValue: number;
-}) {
-  const nextDate = new Date(anchorDate);
-
-  switch (durationType) {
-    case "weekly":
-      nextDate.setDate(nextDate.getDate() + durationValue * 7);
-      return nextDate;
-    case "custom":
-      nextDate.setDate(nextDate.getDate() + durationValue);
-      return nextDate;
-    case "monthly":
-    default:
-      nextDate.setMonth(nextDate.getMonth() + durationValue);
-      return nextDate;
-  }
-}
+export { calculateRenewalEndDate } from "@/modules/renewals/calendar";
 
 export async function renewMemberPlan(
-  {
-    memberPlanId,
-    notes,
-  }: {
-    memberPlanId: string;
-    notes?: string;
-  },
+  input: RenewMemberPlanInput,
   actor: AuthenticatedProfile,
 ) {
   const db = getDb();
 
-  const [currentPlan] = await db
-    .select({
-      id: memberPlans.id,
-      memberId: memberPlans.memberId,
-      planId: memberPlans.planId,
-      endsAt: memberPlans.endsAt,
-      quotaRemaining: memberPlans.quotaRemaining,
-      quotaTotal: memberPlans.quotaTotal,
-      planDurationType: plans.durationType,
-      planDurationValue: plans.durationValue,
-      planQuotaAmount: plans.quotaAmount,
-    })
-    .from(memberPlans)
-    .innerJoin(plans, eq(plans.id, memberPlans.planId))
-    .where(and(eq(memberPlans.id, memberPlanId), eq(memberPlans.status, "active")))
-    .limit(1);
-
-  if (!currentPlan) {
-    throw new Error("No encontramos un plan activo para renovar.");
-  }
-
-  const now = new Date();
-  const anchorDate = currentPlan.endsAt > now ? currentPlan.endsAt : now;
-  const newEndDate = addPlanDuration({
-    anchorDate,
-    durationType: currentPlan.planDurationType,
-    durationValue: currentPlan.planDurationValue,
-  });
-  const snapshot = buildRenewalSnapshot({
-    oldQuotaRemaining: currentPlan.quotaRemaining,
-    newQuotaTotal: currentPlan.planQuotaAmount,
-  });
-
   return db.transaction(async (tx) => {
+    const [currentPlan] = await tx
+      .select({
+        id: memberPlans.id,
+        memberId: memberPlans.memberId,
+        memberName: members.fullName,
+        planId: memberPlans.planId,
+        endsAt: memberPlans.endsAt,
+        nextPaymentDueAt: memberPlans.nextPaymentDueAt,
+        quotaRemaining: memberPlans.quotaRemaining,
+        quotaTotal: memberPlans.quotaTotal,
+        planDurationType: plans.durationType,
+        planDurationValue: plans.durationValue,
+        planQuotaAmount: plans.quotaAmount,
+      })
+      .from(memberPlans)
+      .innerJoin(members, eq(members.id, memberPlans.memberId))
+      .innerJoin(plans, eq(plans.id, memberPlans.planId))
+      .where(
+        and(
+          eq(memberPlans.id, input.memberPlanId),
+          eq(memberPlans.status, "active"),
+        ),
+      )
+      .limit(1)
+      .for("update", { of: memberPlans });
+
+    if (!currentPlan) {
+      throw new Error("No encontramos un plan activo para renovar.");
+    }
+
+    if (
+      currentPlan.nextPaymentDueAt.getTime() !==
+      input.expectedNextPaymentDueAt.getTime()
+    ) {
+      throw new RenewalConflictError();
+    }
+
+    const now = new Date();
+    const anchorDate = currentPlan.endsAt > now ? currentPlan.endsAt : now;
+    const newEndDate = calculateRenewalEndDate({
+      anchorDate,
+      durationType: currentPlan.planDurationType,
+      durationValue: currentPlan.planDurationValue,
+    });
+    const snapshot = buildRenewalSnapshot({
+      oldQuotaRemaining: currentPlan.quotaRemaining,
+      newQuotaTotal: currentPlan.planQuotaAmount,
+    });
+
     await tx
       .update(memberPlans)
       .set({
@@ -115,7 +121,12 @@ export async function renewMemberPlan(
         newEndDate,
         oldQuotaRemaining: snapshot.oldQuotaRemaining,
         newQuotaTotal: snapshot.quotaTotal,
-        notes: notes ?? null,
+        amountReceived: input.amountReceived.toFixed(2),
+        currency: input.currency,
+        paymentMethod: input.paymentMethod,
+        paidAt: input.paidAt,
+        externalReference: input.externalReference ?? null,
+        notes: input.notes ?? null,
       })
       .returning({ id: renewals.id });
 
@@ -127,13 +138,20 @@ export async function renewMemberPlan(
       entityId: currentPlan.id,
       metadata: {
         renewalId: renewal.id,
+        oldEndDate: currentPlan.endsAt,
         newEndDate,
         quotaTotal: snapshot.quotaTotal,
+        amountReceived: input.amountReceived,
+        currency: input.currency,
+        paymentMethod: input.paymentMethod,
+        paidAt: input.paidAt,
+        externalReference: input.externalReference ?? null,
       },
     });
 
     return {
       renewalId: renewal.id,
+      memberName: currentPlan.memberName,
       newEndDate,
       quotaRemaining: snapshot.quotaRemaining,
     };

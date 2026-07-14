@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, eq, gte, lte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { memberPlans, members, plans } from "@/lib/db/schema";
 import { getOperationalSettings } from "@/modules/settings/queries";
@@ -74,23 +74,4 @@ export async function listRenewalAlerts({
     upcomingRenewals,
     lowQuotaPlans,
   };
-}
-
-export async function listRecentRenewals() {
-  const db = getDb();
-
-  return db
-    .select({
-      id: memberPlans.id,
-      memberName: members.fullName,
-      planName: plans.name,
-      quotaRemaining: memberPlans.quotaRemaining,
-      nextPaymentDueAt: memberPlans.nextPaymentDueAt,
-      lastRenewedAt: memberPlans.lastRenewedAt,
-    })
-    .from(memberPlans)
-    .innerJoin(members, eq(members.id, memberPlans.memberId))
-    .innerJoin(plans, eq(plans.id, memberPlans.planId))
-    .where(eq(memberPlans.status, "active"))
-    .orderBy(desc(memberPlans.lastRenewedAt), asc(memberPlans.nextPaymentDueAt));
 }

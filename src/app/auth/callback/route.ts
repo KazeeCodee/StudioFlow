@@ -1,14 +1,7 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+import { getSafeInternalPath } from "@/lib/safe-redirect";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-function getSafeNextPath(next: string | null, fallback = "/login") {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) {
-    return fallback;
-  }
-
-  return next;
-}
 
 function buildRedirectUrl(request: NextRequest, pathname: string, error?: string) {
   const redirectUrl = request.nextUrl.clone();
@@ -26,7 +19,7 @@ export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
   const type = request.nextUrl.searchParams.get("type") as EmailOtpType | null;
-  const nextPath = getSafeNextPath(
+  const nextPath = getSafeInternalPath(
     request.nextUrl.searchParams.get("next"),
     "/login",
   );

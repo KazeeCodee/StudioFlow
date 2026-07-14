@@ -1,0 +1,56 @@
+name: Staging E2E
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studioflow-staging-e2e
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      CI: "true"
+      E2E_ALLOW_MUTATIONS: "true"
+      E2E_EXPECTED_SUPABASE_PROJECT_REF: ${{ secrets.STAGING_SUPABASE_PROJECT_REF }}
+      E2E_PRODUCTION_SUPABASE_PROJECT_REF: ${{ secrets.PRODUCTION_SUPABASE_PROJECT_REF }}
+      E2E_BASE_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      DATABASE_POOL_MAX: "1"
+      APP_URL: http://127.0.0.1:3000
+      CRON_SECRET: staging-e2e-placeholder
+      REDIS_URL: redis://127.0.0.1:6379
+      EMAIL_TRANSPORT_MODE: log
+      CSP_REPORT_ONLY: "true"
+      USE_NEXT_RSPACK: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

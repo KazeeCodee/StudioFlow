@@ -6,6 +6,12 @@ import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { auditLogs, systemSettings } from "@/lib/db/schema";
 import { canManageSettings } from "@/lib/permissions/guards";
+import {
+  consumeRateLimit,
+  logRateLimitUnavailable,
+  redisRateLimitStore,
+} from "@/lib/rate-limit";
+import { buildRateLimitKey } from "@/lib/request-identity";
 import { requireStaffContext } from "@/modules/auth/queries";
 import {
   getOperationalSettings,
@@ -82,6 +88,21 @@ export async function sendTestNotificationAction(formData: FormData) {
 
   if (!canManageSettings(profile.role)) {
     redirect("/admin");
+  }
+
+  const rateLimit = await consumeRateLimit({
+    failureMode: "open",
+    key: buildRateLimitKey("settings:test-email", [profile.id]),
+    limit: 5,
+    onUnavailable: () => logRateLimitUnavailable("settings:test-email"),
+    store: redisRateLimitStore,
+    windowMs: 60 * 60 * 1_000,
+  });
+
+  if (!rateLimit.allowed) {
+    throw new Error(
+      "Demasiados emails de prueba. Intenta nuevamente mas tarde.",
+    );
   }
 
   const input = testNotificationSchema.parse({

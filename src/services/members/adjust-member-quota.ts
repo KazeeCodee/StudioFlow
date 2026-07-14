@@ -9,6 +9,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { auditLogs, memberPlans } from "@/lib/db/schema";
 import type { AuthenticatedProfile } from "@/modules/auth/types";
+import { lockActiveMemberPlan } from "@/services/bookings/booking-transaction";
 
 export function buildQuotaAdjustmentSnapshot({
   quotaTotal,
@@ -48,30 +49,31 @@ export async function adjustMemberQuota(
 ) {
   const db = getDb();
 
-  const [activeMemberPlan] = await db
-    .select({
-      id: memberPlans.id,
-      quotaTotal: memberPlans.quotaTotal,
-      quotaUsed: memberPlans.quotaUsed,
-      quotaRemaining: memberPlans.quotaRemaining,
-    })
-    .from(memberPlans)
-    .where(and(eq(memberPlans.memberId, memberId), eq(memberPlans.status, "active")))
-    .limit(1);
+  return db.transaction(async (tx) => {
+    await lockActiveMemberPlan(tx, memberId);
+    const [activeMemberPlan] = await tx
+      .select({
+        id: memberPlans.id,
+        quotaTotal: memberPlans.quotaTotal,
+        quotaUsed: memberPlans.quotaUsed,
+        quotaRemaining: memberPlans.quotaRemaining,
+      })
+      .from(memberPlans)
+      .where(and(eq(memberPlans.memberId, memberId), eq(memberPlans.status, "active")))
+      .limit(1);
 
-  if (!activeMemberPlan) {
-    throw new Error("El miembro no tiene un plan activo para ajustar.");
-  }
+    if (!activeMemberPlan) {
+      throw new Error("El miembro no tiene un plan activo para ajustar.");
+    }
 
-  const snapshot = buildQuotaAdjustmentSnapshot({
-    quotaTotal: activeMemberPlan.quotaTotal,
-    quotaUsed: activeMemberPlan.quotaUsed,
-    quotaRemaining: activeMemberPlan.quotaRemaining,
-    delta,
-  });
-  const now = new Date();
+    const snapshot = buildQuotaAdjustmentSnapshot({
+      quotaTotal: activeMemberPlan.quotaTotal,
+      quotaUsed: activeMemberPlan.quotaUsed,
+      quotaRemaining: activeMemberPlan.quotaRemaining,
+      delta,
+    });
+    const now = new Date();
 
-  await db.transaction(async (tx) => {
     await tx
       .update(memberPlans)
       .set({
@@ -98,11 +100,11 @@ export async function adjustMemberQuota(
         quotaRemaining: snapshot.quotaRemaining,
       },
     });
-  });
 
-  return {
-    memberPlanId: activeMemberPlan.id,
-    quotaTotal: snapshot.quotaTotal,
-    quotaRemaining: snapshot.quotaRemaining,
-  };
+    return {
+      memberPlanId: activeMemberPlan.id,
+      quotaTotal: snapshot.quotaTotal,
+      quotaRemaining: snapshot.quotaRemaining,
+    };
+  });
 }

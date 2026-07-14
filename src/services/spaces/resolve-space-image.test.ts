@@ -109,4 +109,37 @@ describe("resolveSpaceImageUrl", () => {
     expect(remove).toHaveBeenCalledWith(["spaces/sala/actual.jpg"]);
     expect(upload).not.toHaveBeenCalled();
   });
+
+  it.each([
+    {
+      file: new File(["<svg></svg>"], "plano.svg", { type: "image/svg+xml" }),
+      message: "La imagen debe ser JPG, PNG, GIF o WEBP.",
+    },
+    {
+      file: new File([], "vacia.png", { type: "image/png" }),
+      message: "La imagen no puede estar vacia.",
+    },
+    {
+      file: new File(["fake"], "foto.jpg", { type: "image/png" }),
+      message: "La extension de la imagen no coincide con su tipo MIME.",
+    },
+    {
+      file: new File([new Uint8Array(5 * 1024 * 1024 + 1)], "grande.webp", {
+        type: "image/webp",
+      }),
+      message: "La imagen no puede superar los 5 MB.",
+    },
+  ])("rechaza uploads invalidos: $message", async ({ file, message }) => {
+    await expect(
+      resolveSpaceImageUrl({
+        adminClient: storageClient as never,
+        file,
+        projectUrl: "https://rmkngkkuglexnzzuvdgb.supabase.co",
+        removeImage: false,
+        slug: "sala-podcast",
+      }),
+    ).rejects.toThrow(message);
+
+    expect(upload).not.toHaveBeenCalled();
+  });
 });

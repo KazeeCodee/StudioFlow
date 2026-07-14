@@ -35,4 +35,17 @@ describe("updateSession", () => {
     expect(getUser).toHaveBeenCalled();
     expect(response).toBeDefined();
   });
+
+  it("conserva los headers internos al refrescar cookies", async () => {
+    const { updateSession } = await import("@/lib/supabase/proxy");
+    const request = new NextRequest("https://studioflow.test/member");
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("content-security-policy", "script-src 'nonce-test'");
+
+    const response = await updateSession(request, requestHeaders);
+
+    expect(
+      response.headers.get("x-middleware-request-content-security-policy"),
+    ).toBe("script-src 'nonce-test'");
+  });
 });

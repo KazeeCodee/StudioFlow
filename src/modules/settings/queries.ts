@@ -7,11 +7,12 @@ import {
 } from "@/modules/settings/schema";
 
 export const operationalSettingsKey = "operational_rules";
+type SettingsQueryExecutor = Pick<ReturnType<typeof getDb>, "select">;
 
-export async function getOperationalSettings() {
-  const db = getDb();
-
-  const [storedSettings] = await db
+export async function getOperationalSettings(
+  executor: SettingsQueryExecutor = getDb(),
+) {
+  const [storedSettings] = await executor
     .select({
       id: systemSettings.id,
       valueJson: systemSettings.valueJson,

@@ -1,16 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { expect, type Page, type TestInfo } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import postgres from "postgres";
 import { getStudioDateTimeParts, parseStudioDateTimeInput } from "@/lib/datetime";
-
-type LoadedEnv = {
-  NEXT_PUBLIC_SUPABASE_URL: string;
-  SUPABASE_SERVICE_ROLE_KEY: string;
-  DATABASE_URL: string;
-};
+import { loadE2EEnvironment, type E2EEnvironment } from "./e2e-env";
+import { closeSqlAfterCleanup } from "./resource-cleanup";
 
 type StaffRole = "super_admin" | "admin" | "operator";
 type DurationType = "weekly" | "monthly" | "custom";
@@ -46,8 +40,7 @@ type CreatedBooking = {
   id: string;
 };
 
-let cachedEnv: LoadedEnv | null = null;
-let cachedSql: postgres.Sql | null = null;
+let cachedEnv: E2EEnvironment | null = null;
 let cachedAdminClient: ReturnType<typeof createClient> | null = null;
 
 function loadEnv() {
@@ -55,54 +48,15 @@ function loadEnv() {
     return cachedEnv;
   }
 
-  const envPath = path.resolve(process.cwd(), ".env.local");
-  const envFile = readFileSync(envPath, "utf8");
-  const parsed = new Map<string, string>();
-
-  for (const rawLine of envFile.split(/\r?\n/)) {
-    const line = rawLine.trim();
-
-    if (!line || line.startsWith("#")) {
-      continue;
-    }
-
-    const separatorIndex = line.indexOf("=");
-
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = line.slice(0, separatorIndex).trim();
-    const value = line.slice(separatorIndex + 1).trim();
-    parsed.set(key, value);
-  }
-
-  const getValue = (key: keyof LoadedEnv) => process.env[key] ?? parsed.get(key);
-  const env = {
-    NEXT_PUBLIC_SUPABASE_URL: getValue("NEXT_PUBLIC_SUPABASE_URL"),
-    SUPABASE_SERVICE_ROLE_KEY: getValue("SUPABASE_SERVICE_ROLE_KEY"),
-    DATABASE_URL: getValue("DATABASE_URL"),
-  };
-
-  if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !env.DATABASE_URL) {
-    throw new Error("Faltan variables requeridas para correr los E2E.");
-  }
-
-  cachedEnv = env as LoadedEnv;
+  cachedEnv = loadE2EEnvironment();
   return cachedEnv;
 }
 
-function getSql() {
-  if (cachedSql) {
-    return cachedSql;
-  }
-
-  cachedSql = postgres(loadEnv().DATABASE_URL, {
+function createSqlClient() {
+  return postgres(loadEnv().DATABASE_URL, {
     max: 1,
     prepare: false,
   });
-
-  return cachedSql;
 }
 
 function getAdminClient() {
@@ -200,7 +154,7 @@ export function getFutureStudioDateForWeekday({
 export class StudioFlowTestKit {
   readonly prefix: string;
 
-  private readonly sql = getSql();
+  private readonly sql = createSqlClient();
 
   private readonly adminClient = getAdminClient();
 
@@ -634,8 +588,16 @@ export class StudioFlowTestKit {
     const [renewal] = await this.sql<{
       id: string;
       notes: string | null;
+      amountReceived: string | null;
+      paymentMethod: string | null;
+      externalReference: string | null;
     }[]>`
-      select id, notes
+      select
+        id,
+        notes,
+        amount_received as "amountReceived",
+        payment_method as "paymentMethod",
+        external_reference as "externalReference"
       from renewals
       where member_plan_id = ${memberPlanId}
       order by renewed_at desc
@@ -646,40 +608,42 @@ export class StudioFlowTestKit {
   }
 
   async cleanup() {
-    await this.sql`delete from notification_deliveries where recipient_email like ${`${this.prefix}%`}`;
+    await closeSqlAfterCleanup(this.sql, async () => {
+      await this.sql`delete from notification_deliveries where recipient_email like ${`${this.prefix}%`}`;
 
-    for (const bookingId of this.trackedBookingIds) {
-      await this.sql`delete from audit_logs where entity_id = ${bookingId}`;
-      await this.sql`delete from bookings where id = ${bookingId}`;
-    }
+      for (const bookingId of this.trackedBookingIds) {
+        await this.sql`delete from audit_logs where entity_id = ${bookingId}`;
+        await this.sql`delete from bookings where id = ${bookingId}`;
+      }
 
-    for (const memberPlanId of this.trackedMemberPlanIds) {
-      await this.sql`delete from audit_logs where entity_id = ${memberPlanId}`;
-    }
+      for (const memberPlanId of this.trackedMemberPlanIds) {
+        await this.sql`delete from audit_logs where entity_id = ${memberPlanId}`;
+      }
 
-    for (const memberId of this.trackedMemberIds) {
-      await this.sql`delete from audit_logs where entity_id = ${memberId}`;
-      await this.sql`delete from members where id = ${memberId}`;
-    }
+      for (const memberId of this.trackedMemberIds) {
+        await this.sql`delete from audit_logs where entity_id = ${memberId}`;
+        await this.sql`delete from members where id = ${memberId}`;
+      }
 
-    for (const profileId of this.trackedProfileIds) {
-      await this.sql`delete from audit_logs where actor_id = ${profileId}`;
-      await this.sql`delete from profiles where id = ${profileId}`;
-    }
+      for (const profileId of this.trackedProfileIds) {
+        await this.sql`delete from audit_logs where actor_id = ${profileId}`;
+        await this.sql`delete from profiles where id = ${profileId}`;
+      }
 
-    for (const spaceId of this.trackedSpaceIds) {
-      await this.sql`delete from audit_logs where entity_id = ${spaceId}`;
-      await this.sql`delete from spaces where id = ${spaceId}`;
-    }
+      for (const spaceId of this.trackedSpaceIds) {
+        await this.sql`delete from audit_logs where entity_id = ${spaceId}`;
+        await this.sql`delete from spaces where id = ${spaceId}`;
+      }
 
-    for (const planId of this.trackedPlanIds) {
-      await this.sql`delete from audit_logs where entity_id = ${planId}`;
-      await this.sql`delete from plans where id = ${planId}`;
-    }
+      for (const planId of this.trackedPlanIds) {
+        await this.sql`delete from audit_logs where entity_id = ${planId}`;
+        await this.sql`delete from plans where id = ${planId}`;
+      }
 
-    for (const authUserId of this.trackedAuthUserIds) {
-      await this.adminClient.auth.admin.deleteUser(authUserId);
-    }
+      for (const authUserId of this.trackedAuthUserIds) {
+        await this.adminClient.auth.admin.deleteUser(authUserId);
+      }
+    });
   }
 }
 

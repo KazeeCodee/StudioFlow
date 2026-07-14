@@ -7,6 +7,12 @@ import { getDb } from "@/lib/db";
 import { parseStudioDateTimeInput } from "@/lib/datetime";
 import { auditLogs, bookings, spaceAvailabilityRules, spaceBlocks, spaces } from "@/lib/db/schema";
 import { canManageSpaces } from "@/lib/permissions/guards";
+import {
+  consumeRateLimit,
+  logRateLimitUnavailable,
+  redisRateLimitStore,
+} from "@/lib/rate-limit";
+import { buildRateLimitKey } from "@/lib/request-identity";
 import { slugify } from "@/lib/utils";
 import { requireStaffContext } from "@/modules/auth/queries";
 import type { AppRole } from "@/modules/auth/types";
@@ -38,13 +44,36 @@ function assertCanManageSpaces(role: AppRole) {
   }
 }
 
+async function assertSpaceUploadRateLimit(profileId: string, file: FormDataEntryValue | null) {
+  if (!(file instanceof File) || (file.size === 0 && file.name.length === 0)) {
+    return;
+  }
+
+  const rateLimit = await consumeRateLimit({
+    failureMode: "open",
+    key: buildRateLimitKey("spaces:upload", [profileId]),
+    limit: 20,
+    onUnavailable: () => logRateLimitUnavailable("spaces:upload"),
+    store: redisRateLimitStore,
+    windowMs: 15 * 60 * 1_000,
+  });
+
+  if (!rateLimit.allowed) {
+    throw new Error(
+      "Demasiadas imagenes subidas. Intenta nuevamente mas tarde.",
+    );
+  }
+}
+
 export async function createSpaceAction(formData: FormData) {
   const { profile } = await requireStaffContext();
   assertCanManageSpaces(profile.role);
+  const imageFile = formData.get("imageFile");
+  await assertSpaceUploadRateLimit(profile.id, imageFile);
   const name = String(formData.get("name") ?? "");
   const slug = slugify(name);
   const imageUrl = await resolveSpaceImageUrl({
-    file: formData.get("imageFile") as File | null,
+    file: imageFile as File | null,
     removeImage: false,
     slug,
   });
@@ -106,12 +135,14 @@ export async function createSpaceAction(formData: FormData) {
 export async function updateSpaceAction(formData: FormData) {
   const { profile } = await requireStaffContext();
   assertCanManageSpaces(profile.role);
+  const imageFile = formData.get("imageFile");
+  await assertSpaceUploadRateLimit(profile.id, imageFile);
   const spaceId = String(formData.get("spaceId") ?? "");
   const name = String(formData.get("name") ?? "");
   const slug = slugify(name);
   const imageUrl = await resolveSpaceImageUrl({
     currentImageUrl: String(formData.get("currentImageUrl") ?? "").trim() || null,
-    file: formData.get("imageFile") as File | null,
+    file: imageFile as File | null,
     removeImage: formData.get("removeImage") === "on",
     slug,
   });

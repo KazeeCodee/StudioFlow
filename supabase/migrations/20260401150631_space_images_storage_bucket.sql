@@ -1,3 +1,4 @@
+-- Filename aligned with the version already recorded in production migration history.
 insert into storage.buckets (
   id,
   name,
@@ -15,8 +16,7 @@ values (
     'image/jpg',
     'image/png',
     'image/gif',
-    'image/webp',
-    'image/svg+xml'
+    'image/webp'
   ]::text[]
 )
 on conflict (id) do update

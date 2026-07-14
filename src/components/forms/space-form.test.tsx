@@ -17,6 +17,10 @@ describe("SpaceForm", () => {
     );
 
     expect(screen.getByLabelText(/subir imagen/i)).toHaveAttribute("type", "file");
+    expect(screen.getByLabelText(/subir imagen/i)).toHaveAttribute(
+      "accept",
+      "image/jpeg,image/jpg,image/png,image/gif,image/webp",
+    );
     expect(screen.getByLabelText(/eliminar imagen actual/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/imagen principal/i)).not.toBeInTheDocument();
   });

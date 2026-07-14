@@ -1,3 +1,5 @@
+# Compatibilidad para servicios Railway existentes que aun usan Nixpacks.
+# Los servicios nuevos se configuran con Railpack en railway*.toml.
 [variables]
 NIXPACKS_NODE_VERSION = "20"
 

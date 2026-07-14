@@ -32,6 +32,14 @@ const errorMessages: Record<string, { title: string; description: string }> = {
     description:
       "Tu cuenta esta inactiva o suspendida. Contacta a un administrador.",
   },
+  rate_limited: {
+    title: "Demasiados intentos",
+    description: "Esperá unos minutos antes de volver a intentar.",
+  },
+  temporarily_unavailable: {
+    title: "Acceso temporalmente no disponible",
+    description: "Probá nuevamente en unos minutos.",
+  },
 };
 
 const statusMessages: Record<string, { title: string; description: string }> = {

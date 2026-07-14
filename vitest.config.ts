@@ -15,10 +15,21 @@ export default defineConfig({
     globals: true,
     passWithNoTests: true,
     setupFiles: ["./src/test/setup.ts"],
-    exclude: ["**/node_modules/**", "**/.git/**", "tests/e2e/**"],
+    exclude: [
+      "**/node_modules/**",
+      "**/.git/**",
+      ".worktrees/**",
+      "tests/e2e/**",
+    ],
     coverage: {
       provider: "v8",
-      reporter: ["text", "html"],
+      reporter: ["text", "html", "json-summary"],
+      thresholds: {
+        statements: 56.61,
+        branches: 51.64,
+        functions: 61.41,
+        lines: 56.48,
+      },
     },
   },
 });
