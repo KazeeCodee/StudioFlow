@@ -42,6 +42,7 @@ Variables mínimas:
 Variables operativas:
 
 - `APP_URL`
+- `CSP_REPORT_ONLY` (`true` en staging durante el ajuste de la política; `false` en producción)
 - `CRON_SECRET`
 - `DATABASE_POOL_MAX`
 - `EMAIL_TRANSPORT_MODE`
