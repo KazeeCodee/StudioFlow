@@ -8,6 +8,7 @@ import { SpaceStatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SpacesGrid } from "@/components/spaces/spaces-grid";
 import { SpacesViewToggle } from "@/components/spaces/spaces-view-toggle";
+import { AdminResourceRow } from "@/components/admin/admin-resource-row";
 import { canManageSpaces } from "@/lib/permissions/guards";
 import { requireStaffContext } from "@/modules/auth/queries";
 import { listSpaces } from "@/modules/spaces/queries";
@@ -93,6 +94,9 @@ export default async function SpacesPage({ searchParams }: SpacesPageProps) {
                     <TableHead className="py-3 text-right text-xs font-semibold uppercase tracking-wide">
                       Media
                     </TableHead>
+                    <TableHead className="py-3 text-right text-xs font-semibold uppercase tracking-wide">
+                      Acción
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -100,17 +104,16 @@ export default async function SpacesPage({ searchParams }: SpacesPageProps) {
                     const mediaCount =
                       (space.galleryUrls?.length ?? 0) + (space.videoLinks?.length ?? 0);
                     return (
-                      <TableRow
+                      <AdminResourceRow
                         key={space.id}
+                        href={`/admin/spaces/${space.id}`}
+                        label={space.name}
                         className="group border-border/40 transition-colors hover:bg-muted/30"
                       >
                         <TableCell className="py-3">
-                          <Link
-                            href={`/admin/spaces/${space.id}`}
-                            className="font-semibold text-foreground transition-colors hover:text-primary"
-                          >
+                          <span className="font-semibold text-foreground">
                             {space.name}
-                          </Link>
+                          </span>
                           <p className="mt-0.5 text-xs text-muted-foreground">{space.slug}</p>
                         </TableCell>
                         <TableCell className="py-3">
@@ -136,7 +139,7 @@ export default async function SpacesPage({ searchParams }: SpacesPageProps) {
                             <span className="text-xs text-muted-foreground/50">—</span>
                           )}
                         </TableCell>
-                      </TableRow>
+                      </AdminResourceRow>
                     );
                   })}
                 </TableBody>
