@@ -165,6 +165,22 @@ npm run test:e2e
 npm run build
 ```
 
+### E2E aislado contra staging
+
+Los E2E con mutaciones no leen `.env.local` y nunca deben apuntar a produccion:
+
+```bash
+cp .env.e2e.example .env.e2e.local
+```
+
+Completá las credenciales del proyecto **staging**, indicá el project ref real de produccion solamente como guarda y cambiá `E2E_ALLOW_MUTATIONS=true` justo antes de una corrida intencional. El loader exige que la URL de Supabase y `DATABASE_URL` pertenezcan al ref staging esperado y aborta si detecta el ref de produccion.
+
+```bash
+npm run test:e2e
+```
+
+Cada spec limpia sus usuarios/registros en `finally` y cierra su cliente SQL. Si falta `.env.e2e.local`, el opt-in o una referencia no coincide, Playwright aborta antes de iniciar el servidor.
+
 ## Notificaciones
 
 Por defecto el sistema no envía correos reales:
