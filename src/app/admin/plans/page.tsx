@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
+import { AdminResourceRow } from "@/components/admin/admin-resource-row";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -45,23 +46,26 @@ export default async function PlansPage() {
                 <TableHead>Vigencia</TableHead>
                 <TableHead>Cupos</TableHead>
                 <TableHead>Cancelación</TableHead>
+                <TableHead className="text-right">Acción</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-muted-foreground">
+                  <TableCell colSpan={6} className="text-muted-foreground">
                     Todavía no hay planes creados.
                   </TableCell>
                 </TableRow>
               ) : (
                 items.map((plan) => (
-                  <TableRow key={plan.id}>
+                  <AdminResourceRow
+                    key={plan.id}
+                    href={`/admin/plans/${plan.id}`}
+                    label={plan.name}
+                  >
                     <TableCell>
                       <div>
-                        <Link href={`/admin/plans/${plan.id}`} className="font-medium hover:underline">
-                          {plan.name}
-                        </Link>
+                        <p className="font-medium">{plan.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {plan.description ?? "Sin descripción"}
                         </p>
@@ -73,7 +77,7 @@ export default async function PlansPage() {
                     </TableCell>
                     <TableCell>{plan.quotaAmount}</TableCell>
                     <TableCell>{plan.cancellationPolicyHours}h</TableCell>
-                  </TableRow>
+                  </AdminResourceRow>
                 ))
               )}
             </TableBody>
