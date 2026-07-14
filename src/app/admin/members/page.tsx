@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
+import { AdminResourceRow } from "@/components/admin/admin-resource-row";
 import { formatStudioDate } from "@/lib/datetime";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,23 +47,26 @@ export default async function MembersPage() {
                 <TableHead>Plan</TableHead>
                 <TableHead>Cupos restantes</TableHead>
                 <TableHead>Vence</TableHead>
+                <TableHead className="text-right">Acción</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-muted-foreground">
+                  <TableCell colSpan={6} className="text-muted-foreground">
                     Todavia no hay miembros creados.
                   </TableCell>
                 </TableRow>
               ) : (
                 items.map((member) => (
-                  <TableRow key={member.id}>
+                  <AdminResourceRow
+                    key={member.id}
+                    href={`/admin/members/${member.id}`}
+                    label={member.fullName}
+                  >
                     <TableCell>
                       <div>
-                        <Link href={`/admin/members/${member.id}`} className="font-medium hover:underline">
-                          {member.fullName}
-                        </Link>
+                        <p className="font-medium">{member.fullName}</p>
                         <p className="text-xs text-muted-foreground">{member.email}</p>
                       </div>
                     </TableCell>
@@ -70,7 +74,7 @@ export default async function MembersPage() {
                     <TableCell>{member.planName ?? "Sin plan"}</TableCell>
                     <TableCell>{member.quotaRemaining ?? "-"}</TableCell>
                     <TableCell>{member.activePlanEndsAt ? formatStudioDate(member.activePlanEndsAt) : "-"}</TableCell>
-                  </TableRow>
+                  </AdminResourceRow>
                 ))
               )}
             </TableBody>
