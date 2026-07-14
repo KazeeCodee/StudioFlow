@@ -77,6 +77,8 @@ Notas:
 - `0002` habilita RLS y políticas mínimas para staff/member.
 - `0003` crea el bucket público `uploads` para imágenes.
 - `0004` agrega galería de imágenes y videos de YouTube a `spaces`.
+- El bucket `uploads` acepta solamente JPG/JPEG, PNG, GIF y WebP de hasta 5 MB.
+- Antes de endurecer un bucket existente, listá y exportá cualquier SVG. Las copias de la base de datos no restauran objetos eliminados de Storage.
 
 Si usás Supabase CLI o un pipeline propio, podés ejecutar esas migraciones con tu flujo habitual. Si no, podés correrlas desde el SQL Editor de Supabase.
 

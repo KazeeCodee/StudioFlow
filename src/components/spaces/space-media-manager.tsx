@@ -221,11 +221,11 @@ export function SpaceMediaManager({
           name="imageFile"
           type="file"
           aria-label="Subir imagen"
-          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml"
+          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
           className="cursor-pointer file:cursor-pointer file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-1 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/20"
         />
         <p className="text-xs text-muted-foreground">
-          JPG, PNG, GIF, WEBP o SVG · Máximo 5 MB
+          JPG, PNG, GIF o WEBP · Máximo 5 MB
         </p>
       </div>
 

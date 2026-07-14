@@ -15,8 +15,7 @@ values (
     'image/jpg',
     'image/png',
     'image/gif',
-    'image/webp',
-    'image/svg+xml'
+    'image/webp'
   ]::text[]
 )
 on conflict (id) do update

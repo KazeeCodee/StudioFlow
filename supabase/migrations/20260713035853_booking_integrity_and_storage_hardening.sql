@@ -19,3 +19,16 @@ alter table public.member_plans
     and quota_remaining >= 0
     and quota_used + quota_remaining = quota_total
   );
+
+update storage.buckets
+set
+  file_size_limit = 5242880,
+  allowed_mime_types = array[
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp'
+  ]::text[],
+  updated_at = now()
+where id = 'uploads';
