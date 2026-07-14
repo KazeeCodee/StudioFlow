@@ -11,14 +11,14 @@ let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 // in environments without outbound IPv6 support.
 setDefaultResultOrder("ipv4first");
 
-function getDatabasePoolMax() {
+export function getDatabasePoolMax() {
   const configuredMax = Number(process.env.DATABASE_POOL_MAX);
 
   if (Number.isFinite(configuredMax) && configuredMax > 0) {
     return configuredMax;
   }
 
-  return process.env.NODE_ENV === "production" ? 10 : 1;
+  return process.env.NODE_ENV === "production" ? 5 : 1;
 }
 
 function getClient() {

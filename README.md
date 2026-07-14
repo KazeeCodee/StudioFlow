@@ -114,10 +114,15 @@ npm run dev
 
 ## Deploy en Railway
 
-El repo incluye configuracion para Railway/Nixpacks:
+El repo incluye configuracion como codigo para dos servicios Railway:
 
-- `nixpacks.toml` fuerza `npm ci`, `npm run build` y `npm run start`
+- `railway.toml`: servicio web persistente, healthcheck `/api/health/ready` y timeout de 300 segundos
+- `railway.cron.toml`: cron diario `0 12 * * *` UTC que ejecuta `scripts/run-notifications-cron.mjs` y termina
+- `nixpacks.toml`: compatibilidad con deployments existentes; los servicios nuevos usan Railpack
 - `.nvmrc` y `package.json` fijan Node 20
+- el build standalone copia `public` y `.next/static` dentro de `.next/standalone`
+
+En Railway, el servicio web usa el archivo por defecto `/railway.toml`. El servicio cron debe apuntar su Config File Path a `/railway.cron.toml`. Mantené una sola replica web para el primer release y no asignes un dominio publico al servicio cron.
 
 Variables minimas a cargar en Railway:
 
@@ -130,11 +135,26 @@ Variables minimas a cargar en Railway:
 
 Variables recomendadas:
 
-- `DATABASE_POOL_MAX=1`
+- `DATABASE_POOL_MAX=5` como punto de partida; validalo contra el limite de conexiones del proyecto Supabase
 - `EMAIL_TRANSPORT_MODE`
 - `EMAIL_FROM`
 - `RESEND_API_KEY`
 - `USE_NEXT_RSPACK=false`
+
+Para el runtime web, copiá desde Supabase el connection string de **Shared Pooler / Session mode** (puerto `5432`) y exigí SSL. La forma esperada es:
+
+```text
+postgresql://postgres.<project-ref>:<password>@aws-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+Usá una conexion directa separada para migraciones. Nunca guardes ninguno de esos valores en Git.
+
+Checklist del dashboard antes de verificar staging:
+
+- web: una replica, Config File Path `/railway.toml`, variables completas y dominio HTTPS
+- cron: Config File Path `/railway.cron.toml`, mismo `APP_URL`/`CRON_SECRET` que el web y sin dominio publico
+- confirmar que una ejecucion manual del cron termina y deja un resumen JSON
+- conservar `vercel.json` hasta demostrar paridad en Railway staging; recien entonces eliminarlo
 
 ## Checks de calidad
 

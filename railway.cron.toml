@@ -1,0 +1,8 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "node --check scripts/run-notifications-cron.mjs"
+
+[deploy]
+startCommand = "node scripts/run-notifications-cron.mjs"
+cronSchedule = "0 12 * * *"
+restartPolicyType = "NEVER"

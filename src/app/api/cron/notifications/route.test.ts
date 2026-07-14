@@ -35,6 +35,7 @@ describe("GET /api/cron/notifications", () => {
     const response = await GET(request);
 
     expect(response.status).toBe(401);
+    expect(sendDailyReminderNotifications).not.toHaveBeenCalled();
   });
 
   it("ejecuta el flujo diario y devuelve el resumen", async () => {
