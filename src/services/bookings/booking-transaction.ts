@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { memberPlans } from "@/lib/db/schema";
+import { bookings, memberPlans } from "@/lib/db/schema";
 
 export type BookingTransaction = Parameters<
   Parameters<ReturnType<typeof getDb>["transaction"]>[0]
@@ -13,6 +13,30 @@ export async function lockBookingSpace(
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtextextended(${spaceId}, 0))`,
   );
+}
+
+export async function lockBooking(
+  tx: BookingTransaction,
+  bookingId: string,
+) {
+  await tx.execute(sql`
+    select ${bookings.id}
+    from ${bookings}
+    where ${bookings.id} = ${bookingId}
+    for update
+  `);
+}
+
+export async function lockMemberPlan(
+  tx: BookingTransaction,
+  memberPlanId: string,
+) {
+  await tx.execute(sql`
+    select ${memberPlans.id}
+    from ${memberPlans}
+    where ${memberPlans.id} = ${memberPlanId}
+    for update
+  `);
 }
 
 export async function lockActiveMemberPlan(
@@ -54,9 +78,12 @@ function getPostgresErrorCode(error: unknown) {
   return null;
 }
 
-export function mapBookingTransactionError(error: unknown): Error {
+export function mapBookingTransactionError(
+  error: unknown,
+  overlapMessage = "El espacio ya tiene una reserva superpuesta.",
+): Error {
   if (getPostgresErrorCode(error) === "23P01") {
-    return new Error("El espacio ya tiene una reserva superpuesta.");
+    return new Error(overlapMessage);
   }
 
   return error instanceof Error ? error : new Error("No pudimos completar la reserva.");

@@ -8,14 +8,17 @@ const getOverlappingSpaceBlocks = vi.fn();
 const getOperationalSettings = vi.fn();
 const getSpaceBookingContext = vi.fn();
 
-const bookingUpdateWhere = vi.fn();
+const bookingUpdateReturning = vi.fn(async () => [{ id: "booking-1" }]);
+const bookingUpdateWhere = vi.fn(() => ({ returning: bookingUpdateReturning }));
 const bookingUpdateSet = vi.fn(() => ({ where: bookingUpdateWhere }));
-const memberPlanUpdateWhere = vi.fn();
+const memberPlanUpdateReturning = vi.fn(async () => [{ id: "plan-1" }]);
+const memberPlanUpdateWhere = vi.fn(() => ({ returning: memberPlanUpdateReturning }));
 const memberPlanUpdateSet = vi.fn(() => ({ where: memberPlanUpdateWhere }));
 const insertValues = vi.fn(() => ({ returning: async () => [{ id: "booking-1" }] }));
 const insertNoReturnValues = vi.fn(() => ({}));
 
 const tx = {
+  execute: vi.fn(),
   update: vi.fn(),
   insert: vi.fn(() => ({
     values: (...args: unknown[]) => {
@@ -130,6 +133,27 @@ describe("rescheduleBooking", () => {
       }),
     );
 
+    vi.useRealTimers();
+  });
+
+  it("bloquea y relee la reserva dentro de la transaccion", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-02T08:00:00Z"));
+
+    const { rescheduleBooking } = await import("@/services/bookings/reschedule-booking");
+    await rescheduleBooking(
+      {
+        bookingId: "booking-1",
+        startsAt: "2026-04-04T15:00",
+        endsAt: "2026-04-04T17:00",
+      },
+      actor,
+    );
+
+    expect(transaction.mock.invocationCallOrder[0]).toBeLessThan(
+      getBookingForReschedule.mock.invocationCallOrder[0],
+    );
+    expect(getBookingForReschedule).toHaveBeenCalledWith("booking-1", tx);
     vi.useRealTimers();
   });
 

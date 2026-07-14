@@ -22,6 +22,8 @@ const planId = "00000000-0000-4000-8000-000000000303";
 const memberPlanId = "00000000-0000-4000-8000-000000000304";
 const firstSpaceId = "00000000-0000-4000-8000-000000000305";
 const secondSpaceId = "00000000-0000-4000-8000-000000000306";
+const firstBookingId = "00000000-0000-4000-8000-000000000307";
+const secondBookingId = "00000000-0000-4000-8000-000000000308";
 
 const actor: AuthenticatedProfile = {
   id: actorId,
@@ -44,11 +46,36 @@ async function clearBookings() {
   await sql`delete from public.bookings where member_id = ${memberId}`;
 }
 
-async function resetQuota(quota: number) {
+async function resetMemberPlan(quota: number) {
+  await sql`delete from public.renewals where member_plan_id = ${memberPlanId}`;
   await sql`
     update public.member_plans
-    set quota_total = ${quota}, quota_used = 0, quota_remaining = ${quota}
+    set quota_total = ${quota}, quota_used = 0, quota_remaining = ${quota},
+        ends_at = '2026-09-01T00:00:00Z', next_payment_due_at = '2026-09-01T00:00:00Z',
+        last_renewed_at = null, renewed_manually = false
     where id = ${memberPlanId}
+  `;
+}
+
+async function seedBooking({
+  bookingId,
+  spaceId,
+  startsAt,
+  endsAt,
+}: {
+  bookingId: string;
+  spaceId: string;
+  startsAt: string;
+  endsAt: string;
+}) {
+  await sql`
+    insert into public.bookings (
+      id, member_id, space_id, member_plan_id, starts_at, ends_at,
+      duration_hours, hourly_quota_cost, quota_consumed, status, created_by
+    ) values (
+      ${bookingId}, ${memberId}, ${spaceId}, ${memberPlanId}, ${startsAt}, ${endsAt},
+      1, 1, 1, 'confirmed', ${actorId}
+    )
   `;
 }
 
@@ -100,7 +127,8 @@ describe("concurrent booking creation", () => {
 
   afterEach(async () => {
     await clearBookings();
-    await resetQuota(10);
+    await resetMemberPlan(10);
+    await sql`delete from public.audit_logs where actor_id = ${actorId}`;
   });
 
   afterAll(async () => {
@@ -115,7 +143,7 @@ describe("concurrent booking creation", () => {
   });
 
   it("returns one domain conflict when two requests overlap", async () => {
-    await resetQuota(10);
+    await resetMemberPlan(10);
     const { createBooking } = await import("@/services/bookings/create-booking");
 
     const results = await Promise.allSettled([
@@ -131,7 +159,7 @@ describe("concurrent booking creation", () => {
   });
 
   it("allows only one request to consume the last quota", async () => {
-    await resetQuota(1);
+    await resetMemberPlan(1);
     const { createBooking } = await import("@/services/bookings/create-booking");
 
     const results = await Promise.allSettled([
@@ -146,5 +174,115 @@ describe("concurrent booking creation", () => {
       where id = ${memberPlanId}
     `;
     expect(quota).toMatchObject({ quota_total: 1, quota_used: 1, quota_remaining: 0 });
+  });
+
+  it("refunds a concurrently cancelled booking only once", async () => {
+    await resetMemberPlan(10);
+    await sql`
+      update public.member_plans
+      set quota_used = 1, quota_remaining = 9
+      where id = ${memberPlanId}
+    `;
+    await seedBooking({
+      bookingId: firstBookingId,
+      spaceId: firstSpaceId,
+      startsAt: "2026-08-03T13:00:00Z",
+      endsAt: "2026-08-03T14:00:00Z",
+    });
+    const { cancelBooking } = await import("@/services/bookings/cancel-booking");
+
+    const results = await Promise.allSettled([
+      cancelBooking({ bookingId: firstBookingId }, actor),
+      cancelBooking({ bookingId: firstBookingId }, actor),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const [quota] = await sql`
+      select quota_total, quota_used, quota_remaining
+      from public.member_plans where id = ${memberPlanId}
+    `;
+    expect(quota).toMatchObject({ quota_total: 10, quota_used: 0, quota_remaining: 10 });
+  });
+
+  it("allows only one concurrent reschedule into the same slot", async () => {
+    await resetMemberPlan(10);
+    await sql`
+      update public.member_plans
+      set quota_used = 2, quota_remaining = 8
+      where id = ${memberPlanId}
+    `;
+    await seedBooking({
+      bookingId: firstBookingId,
+      spaceId: firstSpaceId,
+      startsAt: "2026-08-03T11:00:00Z",
+      endsAt: "2026-08-03T12:00:00Z",
+    });
+    await seedBooking({
+      bookingId: secondBookingId,
+      spaceId: firstSpaceId,
+      startsAt: "2026-08-03T12:00:00Z",
+      endsAt: "2026-08-03T13:00:00Z",
+    });
+    const { rescheduleBooking } = await import("@/services/bookings/reschedule-booking");
+
+    const results = await Promise.allSettled([
+      rescheduleBooking(
+        { bookingId: firstBookingId, startsAt: "2026-08-03T15:00", endsAt: "2026-08-03T16:00" },
+        actor,
+      ),
+      rescheduleBooking(
+        { bookingId: secondBookingId, startsAt: "2026-08-03T15:00", endsAt: "2026-08-03T16:00" },
+        actor,
+      ),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find((result) => result.status === "rejected");
+    expect(rejected).toMatchObject({
+      reason: new Error("El espacio ya tiene una reserva superpuesta en el nuevo horario."),
+    });
+  });
+
+  it("preserves both concurrent manual quota adjustments", async () => {
+    await resetMemberPlan(10);
+    const { adjustMemberQuota } = await import("@/services/members/adjust-member-quota");
+
+    await Promise.all([
+      adjustMemberQuota({ memberId, delta: 1, reason: "Concurrent one" }, actor),
+      adjustMemberQuota({ memberId, delta: 2, reason: "Concurrent two" }, actor),
+    ]);
+
+    const [quota] = await sql`
+      select quota_total, quota_used, quota_remaining
+      from public.member_plans where id = ${memberPlanId}
+    `;
+    expect(quota).toMatchObject({ quota_total: 13, quota_used: 0, quota_remaining: 13 });
+  });
+
+  it("preserves both concurrent renewals", async () => {
+    await resetMemberPlan(10);
+    const { renewMemberPlan } = await import("@/services/renewals/renew-member-plan");
+
+    await renewMemberPlan({ memberPlanId, notes: "Sequential one" }, actor);
+    await renewMemberPlan({ memberPlanId, notes: "Sequential two" }, actor);
+    const [sequentialPlan] = await sql`
+      select ends_at from public.member_plans where id = ${memberPlanId}
+    `;
+
+    await resetMemberPlan(10);
+
+    await Promise.all([
+      renewMemberPlan({ memberPlanId, notes: "Concurrent one" }, actor),
+      renewMemberPlan({ memberPlanId, notes: "Concurrent two" }, actor),
+    ]);
+
+    const [plan] = await sql`
+      select ends_at from public.member_plans where id = ${memberPlanId}
+    `;
+    const [renewalCount] = await sql`
+      select count(*)::int as count from public.renewals where member_plan_id = ${memberPlanId}
+    `;
+    expect(plan.ends_at).toEqual(sequentialPlan.ends_at);
+    expect(renewalCount.count).toBe(2);
   });
 });

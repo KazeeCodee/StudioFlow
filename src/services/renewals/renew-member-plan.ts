@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { auditLogs, memberPlans, plans, renewals } from "@/lib/db/schema";
 import type { AuthenticatedProfile } from "@/modules/auth/types";
+import { lockMemberPlan } from "@/services/bookings/booking-transaction";
 
 export function buildRenewalSnapshot({
   oldQuotaRemaining,
@@ -54,41 +55,41 @@ export async function renewMemberPlan(
   actor: AuthenticatedProfile,
 ) {
   const db = getDb();
-
-  const [currentPlan] = await db
-    .select({
-      id: memberPlans.id,
-      memberId: memberPlans.memberId,
-      planId: memberPlans.planId,
-      endsAt: memberPlans.endsAt,
-      quotaRemaining: memberPlans.quotaRemaining,
-      quotaTotal: memberPlans.quotaTotal,
-      planDurationType: plans.durationType,
-      planDurationValue: plans.durationValue,
-      planQuotaAmount: plans.quotaAmount,
-    })
-    .from(memberPlans)
-    .innerJoin(plans, eq(plans.id, memberPlans.planId))
-    .where(and(eq(memberPlans.id, memberPlanId), eq(memberPlans.status, "active")))
-    .limit(1);
-
-  if (!currentPlan) {
-    throw new Error("No encontramos un plan activo para renovar.");
-  }
-
-  const now = new Date();
-  const anchorDate = currentPlan.endsAt > now ? currentPlan.endsAt : now;
-  const newEndDate = addPlanDuration({
-    anchorDate,
-    durationType: currentPlan.planDurationType,
-    durationValue: currentPlan.planDurationValue,
-  });
-  const snapshot = buildRenewalSnapshot({
-    oldQuotaRemaining: currentPlan.quotaRemaining,
-    newQuotaTotal: currentPlan.planQuotaAmount,
-  });
-
   return db.transaction(async (tx) => {
+    await lockMemberPlan(tx, memberPlanId);
+    const [currentPlan] = await tx
+      .select({
+        id: memberPlans.id,
+        memberId: memberPlans.memberId,
+        planId: memberPlans.planId,
+        endsAt: memberPlans.endsAt,
+        quotaRemaining: memberPlans.quotaRemaining,
+        quotaTotal: memberPlans.quotaTotal,
+        planDurationType: plans.durationType,
+        planDurationValue: plans.durationValue,
+        planQuotaAmount: plans.quotaAmount,
+      })
+      .from(memberPlans)
+      .innerJoin(plans, eq(plans.id, memberPlans.planId))
+      .where(and(eq(memberPlans.id, memberPlanId), eq(memberPlans.status, "active")))
+      .limit(1);
+
+    if (!currentPlan) {
+      throw new Error("No encontramos un plan activo para renovar.");
+    }
+
+    const now = new Date();
+    const anchorDate = currentPlan.endsAt > now ? currentPlan.endsAt : now;
+    const newEndDate = addPlanDuration({
+      anchorDate,
+      durationType: currentPlan.planDurationType,
+      durationValue: currentPlan.planDurationValue,
+    });
+    const snapshot = buildRenewalSnapshot({
+      oldQuotaRemaining: currentPlan.quotaRemaining,
+      newQuotaTotal: currentPlan.planQuotaAmount,
+    });
+
     await tx
       .update(memberPlans)
       .set({

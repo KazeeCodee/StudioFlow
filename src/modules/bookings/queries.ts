@@ -349,20 +349,21 @@ export async function getOverlappingBookings(
     );
 }
 
-export async function getOverlappingBookingsExcludingCurrent({
-  endsAt,
-  spaceId,
-  startsAt,
-  bookingId,
-}: {
-  bookingId: string;
-  spaceId: string;
-  startsAt: Date;
-  endsAt: Date;
-}) {
-  const db = getDb();
-
-  return db
+export async function getOverlappingBookingsExcludingCurrent(
+  {
+    endsAt,
+    spaceId,
+    startsAt,
+    bookingId,
+  }: {
+    bookingId: string;
+    spaceId: string;
+    startsAt: Date;
+    endsAt: Date;
+  },
+  executor: BookingQueryExecutor = getDb(),
+) {
+  return executor
     .select({
       id: bookings.id,
       startsAt: bookings.startsAt,
@@ -500,10 +501,11 @@ export async function listMemberBookings(profileId: string) {
     .orderBy(desc(bookings.startsAt));
 }
 
-export async function getBookingForCancellation(bookingId: string) {
-  const db = getDb();
-
-  const [booking] = await db
+export async function getBookingForCancellation(
+  bookingId: string,
+  executor: BookingQueryExecutor = getDb(),
+) {
+  const [booking] = await executor
     .select({
       id: bookings.id,
       memberId: bookings.memberId,
@@ -528,10 +530,11 @@ export async function getBookingForCancellation(bookingId: string) {
   return booking ?? null;
 }
 
-export async function getBookingForReschedule(bookingId: string) {
-  const db = getDb();
-
-  const [booking] = await db
+export async function getBookingForReschedule(
+  bookingId: string,
+  executor: BookingQueryExecutor = getDb(),
+) {
+  const [booking] = await executor
     .select({
       id: bookings.id,
       memberId: bookings.memberId,
