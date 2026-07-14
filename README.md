@@ -181,6 +181,27 @@ npm run test:e2e
 
 Cada spec limpia sus usuarios/registros en `finally` y cierra su cliente SQL. Si falta `.env.e2e.local`, el opt-in o una referencia no coincide, Playwright aborta antes de iniciar el servidor.
 
+### CI y gates de release
+
+El workflow `CI` ejecuta con Node 20: instalacion reproducible, auditoria de dependencias de produccion, lint, unitarios, integracion sobre Supabase local, cobertura y build. El baseline medido el 2026-07-14 es:
+
+| Metrica | Baseline / umbral |
+| --- | ---: |
+| Statements | 56.61% |
+| Branches | 51.64% |
+| Functions | 61.41% |
+| Lines | 56.48% |
+
+Los umbrales no deben reducirse. `Staging E2E` usa el GitHub Environment `staging`, secretos exclusivos de staging y una concurrency group unica para impedir dos suites mutando el mismo proyecto a la vez.
+
+Configura un ruleset para `master` con pull request obligatorio, al menos una aprobacion, conversaciones resueltas, branch actualizado, bloqueo de force-push/delete y estos status checks requeridos:
+
+- `CI / quality`
+- `CI / database`
+- `Staging E2E / e2e`
+
+No permitas pushes directos. Railway production debe mantener autodeploy deshabilitado y promocion manual hasta registrar dos releases exitosos con todos los gates.
+
 ## Notificaciones
 
 Por defecto el sistema no envía correos reales:

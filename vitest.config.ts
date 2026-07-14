@@ -23,7 +23,13 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      reporter: ["text", "html"],
+      reporter: ["text", "html", "json-summary"],
+      thresholds: {
+        statements: 56.61,
+        branches: 51.64,
+        functions: 61.41,
+        lines: 56.48,
+      },
     },
   },
 });

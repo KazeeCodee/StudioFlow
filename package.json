@@ -10,7 +10,7 @@
     "build": "next build --webpack && node scripts/prepare-standalone.mjs",
     "start": "node .next/standalone/server.js",
     "lint": "eslint src scripts tests *.ts *.mjs",
-    "test": "vitest run src",
+    "test": "vitest run src scripts tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
