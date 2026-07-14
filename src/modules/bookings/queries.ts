@@ -18,6 +18,7 @@ import { getOperationalSettings } from "@/modules/settings/queries";
 import { generateAvailableStartTimes } from "@/services/bookings/generate-available-start-times";
 
 const activeBookingStatuses = ["pending", "confirmed"] as const;
+type BookingQueryExecutor = Pick<ReturnType<typeof getDb>, "select">;
 
 export class BookingAvailabilityNotFoundError extends Error {}
 
@@ -167,10 +168,11 @@ export async function listBookingMemberOptions() {
     .orderBy(members.fullName);
 }
 
-export async function getMemberByProfileId(profileId: string) {
-  const db = getDb();
-
-  const [member] = await db
+export async function getMemberByProfileId(
+  profileId: string,
+  executor: BookingQueryExecutor = getDb(),
+) {
+  const [member] = await executor
     .select({
       id: members.id,
       fullName: members.fullName,
@@ -185,10 +187,11 @@ export async function getMemberByProfileId(profileId: string) {
   return member ?? null;
 }
 
-export async function getActiveMemberPlan(memberId: string) {
-  const db = getDb();
-
-  const [memberPlan] = await db
+export async function getActiveMemberPlan(
+  memberId: string,
+  executor: BookingQueryExecutor = getDb(),
+) {
+  const [memberPlan] = await executor
     .select({
       id: memberPlans.id,
       memberId: memberPlans.memberId,
@@ -209,10 +212,11 @@ export async function getActiveMemberPlan(memberId: string) {
   return memberPlan ?? null;
 }
 
-export async function getSpaceBookingContext(spaceId: string) {
-  const db = getDb();
-
-  const [space] = await db
+export async function getSpaceBookingContext(
+  spaceId: string,
+  executor: BookingQueryExecutor = getDb(),
+) {
+  const [space] = await executor
     .select({
       id: spaces.id,
       name: spaces.name,
@@ -233,7 +237,7 @@ export async function getSpaceBookingContext(spaceId: string) {
     return null;
   }
 
-  const availabilityRules = await db
+  const availabilityRules = await executor
     .select({
       id: spaceAvailabilityRules.id,
       dayOfWeek: spaceAvailabilityRules.dayOfWeek,
@@ -298,10 +302,13 @@ export async function getAvailableStartTimesForSpace({
   });
 }
 
-export async function getOverlappingSpaceBlocks(spaceId: string, startsAt: Date, endsAt: Date) {
-  const db = getDb();
-
-  return db
+export async function getOverlappingSpaceBlocks(
+  spaceId: string,
+  startsAt: Date,
+  endsAt: Date,
+  executor: BookingQueryExecutor = getDb(),
+) {
+  return executor
     .select({
       id: spaceBlocks.id,
       startsAt: spaceBlocks.startsAt,
@@ -318,10 +325,13 @@ export async function getOverlappingSpaceBlocks(spaceId: string, startsAt: Date,
     );
 }
 
-export async function getOverlappingBookings(spaceId: string, startsAt: Date, endsAt: Date) {
-  const db = getDb();
-
-  return db
+export async function getOverlappingBookings(
+  spaceId: string,
+  startsAt: Date,
+  endsAt: Date,
+  executor: BookingQueryExecutor = getDb(),
+) {
+  return executor
     .select({
       id: bookings.id,
       startsAt: bookings.startsAt,
