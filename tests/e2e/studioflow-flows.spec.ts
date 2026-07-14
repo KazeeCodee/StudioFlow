@@ -189,9 +189,13 @@ test("admin registra una renovacion manual y reinicia cupos del plan", async ({ 
 
     await kit.login(page, admin.email, admin.password);
     await page.goto("/admin/renewals");
-    const renewalRow = page.locator("tr").filter({ hasText: member.email });
-    await page.locator(`#notes-${member.memberPlanId}`).fill("Pago validado por E2E");
-    await renewalRow.getByRole("button", { name: /renovar/i }).click();
+    await page.getByRole("button", { name: `Revisar pago de ${member.fullName}` }).click();
+    const review = page.getByRole("region", { name: `Verificar pago de ${member.fullName}` });
+    await review.getByLabel("Importe recibido").fill("25000");
+    await review.getByLabel(/^Referencia/).fill("E2E-TRX-9001");
+    await review.getByLabel(/Nota interna/).fill("Pago validado por E2E");
+    await review.getByRole("checkbox", { name: /confirmo que verifiqu/i }).check();
+    await review.getByRole("button", { name: "Confirmar pago y renovar" }).click();
 
     await expect.poll(async () => (await kit.getMemberPlan(member.memberPlanId))?.quotaRemaining).toBe(12);
     const memberPlan = await kit.getMemberPlan(member.memberPlanId);
@@ -202,8 +206,9 @@ test("admin registra una renovacion manual y reinicia cupos del plan", async ({ 
     await expect.poll(async () => Boolean(await kit.findLatestRenewalForMemberPlan(member.memberPlanId))).toBe(true);
     const renewal = await kit.findLatestRenewalForMemberPlan(member.memberPlanId);
     expect(renewal?.notes).toBe("Pago validado por E2E");
-
-    await expect(page.locator("tr").filter({ hasText: member.email }).first()).toBeVisible();
+    expect(renewal?.amountReceived).toBe("25000.00");
+    expect(renewal?.paymentMethod).toBe("bank_transfer");
+    expect(renewal?.externalReference).toBe("E2E-TRX-9001");
   } finally {
     await kit.cleanup();
   }
