@@ -1,4 +1,5 @@
 import { getEnv } from "@/lib/env";
+import { logger } from "@/lib/logger";
 
 export type SendEmailInput = {
   to: string;
@@ -23,7 +24,7 @@ export async function sendEmail({
   const mode = env.EMAIL_TRANSPORT_MODE ?? "log";
 
   if (mode === "log") {
-    console.info("[email:log]", { to, subject, text });
+    logger.info("email_delivery_skipped", { mode: "log" });
     return {
       status: "skipped",
       reason: "Email transport in log mode.",
@@ -31,10 +32,7 @@ export async function sendEmail({
   }
 
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
-    return {
-      status: "skipped",
-      reason: "Missing Resend configuration.",
-    };
+    throw new Error("Email provider is not configured.");
   }
 
   const response = await fetch("https://api.resend.com/emails", {
@@ -54,8 +52,11 @@ export async function sendEmail({
   });
 
   if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(errorBody || "No se pudo enviar el email.");
+    logger.error("email_provider_rejected", {
+      provider: "resend",
+      status: response.status,
+    });
+    throw new Error("No se pudo enviar el email.");
   }
 
   const body = (await response.json()) as { id?: string };

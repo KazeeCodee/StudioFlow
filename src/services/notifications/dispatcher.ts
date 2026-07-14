@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db";
 import { notificationDeliveries } from "@/lib/db/schema";
 import { getEnv } from "@/lib/env";
 import { sendEmail } from "@/lib/email/transport";
+import { logger } from "@/lib/logger";
 import {
   getBookingNotificationContext,
   getRenewalNotificationContext,
@@ -484,6 +485,13 @@ export async function sendDailyReminderNotifications(now: Date = new Date()) {
     ...staffResults,
     ...memberResults,
   ]);
+
+  logger.info("daily_notifications_completed", {
+    date: dateKey,
+    staffDigestCount: plan.staffDigestDeliveries.length,
+    memberReminderCount: plan.memberReminderDeliveries.length,
+    ...outcomeSummary,
+  });
 
   return {
     staffDigestCount: plan.staffDigestDeliveries.length,

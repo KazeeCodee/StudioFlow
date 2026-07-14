@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { auditLogs, bookings, memberPlans, members, profiles, renewals } from "@/lib/db/schema";
+import { logger } from "@/lib/logger";
 import { canManageMembers } from "@/lib/permissions/guards";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireStaffContext } from "@/modules/auth/queries";
@@ -269,7 +270,10 @@ export async function deleteMemberAction(formData: FormData) {
     const result = await adminClient.auth.admin.deleteUser(memberRecord.profileId);
 
     if (result.error) {
-      console.error("No se pudo borrar el usuario auth del miembro eliminado:", result.error.message);
+      logger.error("member_auth_cleanup_failed", {
+        errorType: result.error.name ?? "unknown",
+        memberId,
+      });
     }
   }
 

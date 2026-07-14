@@ -46,7 +46,12 @@ export const envSchema = z
       return;
     }
 
-    for (const key of ["APP_URL", "CRON_SECRET", "REDIS_URL"] as const) {
+    for (const key of [
+      "APP_URL",
+      "CRON_SECRET",
+      "REDIS_URL",
+      "EMAIL_TRANSPORT_MODE",
+    ] as const) {
       if (!env[key]) {
         context.addIssue({
           code: "custom",

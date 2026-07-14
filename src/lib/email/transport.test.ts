@@ -13,18 +13,30 @@ const mockEnv = vi.hoisted(() => ({
   },
 }));
 
+const loggerInfo = vi.hoisted(() => vi.fn());
+const loggerError = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/env", () => ({
   getEnv: () => mockEnv.env,
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    error: loggerError,
+    info: loggerInfo,
+  },
 }));
 
 describe("sendEmail", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.clearAllMocks();
     mockEnv.env.EMAIL_TRANSPORT_MODE = "log";
+    mockEnv.env.EMAIL_FROM = "StudioFlow <no-reply@example.com>";
+    mockEnv.env.RESEND_API_KEY = "re_test_123";
   });
 
   it("omite el envio en modo log", async () => {
-    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
     const { sendEmail } = await import("@/lib/email/transport");
 
     const result = await sendEmail({
@@ -38,7 +50,9 @@ describe("sendEmail", () => {
       status: "skipped",
       reason: "Email transport in log mode.",
     });
-    expect(infoSpy).toHaveBeenCalled();
+    expect(loggerInfo).toHaveBeenCalledWith("email_delivery_skipped", {
+      mode: "log",
+    });
   });
 
   it("envia por Resend y propaga la clave de idempotencia", async () => {
@@ -72,6 +86,48 @@ describe("sendEmail", () => {
     expect(result).toEqual({
       status: "sent",
       providerMessageId: "email_123",
+    });
+  });
+
+  it("falla en vez de omitir cuando falta la configuracion de Resend", async () => {
+    mockEnv.env.EMAIL_TRANSPORT_MODE = "resend";
+    mockEnv.env.RESEND_API_KEY = "";
+    const { sendEmail } = await import("@/lib/email/transport");
+
+    await expect(
+      sendEmail({
+        to: "ana@studioflow.com",
+        subject: "Test",
+        html: "<p>Privado</p>",
+        text: "Privado",
+      }),
+    ).rejects.toThrow("Email provider is not configured.");
+  });
+
+  it("no propaga el cuerpo de error del proveedor", async () => {
+    mockEnv.env.EMAIL_TRANSPORT_MODE = "resend";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        text: async () => "provider-secret-body",
+      }),
+    );
+    const { sendEmail } = await import("@/lib/email/transport");
+
+    await expect(
+      sendEmail({
+        to: "ana@studioflow.com",
+        subject: "Test",
+        html: "<p>Privado</p>",
+        text: "Privado",
+      }),
+    ).rejects.toThrow("No se pudo enviar el email.");
+
+    expect(loggerError).toHaveBeenCalledWith("email_provider_rejected", {
+      provider: "resend",
+      status: 502,
     });
   });
 });

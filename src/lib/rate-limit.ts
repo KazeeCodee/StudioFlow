@@ -1,5 +1,6 @@
 import { createClient } from "redis";
 import { getEnv } from "@/lib/env";
+import { logger } from "@/lib/logger";
 
 export type RateLimitStoreResult = {
   count: number;
@@ -133,11 +134,5 @@ export async function consumeRateLimit({
 }
 
 export function logRateLimitUnavailable(scope: string) {
-  console.error(
-    JSON.stringify({
-      event: "rate_limit_store_unavailable",
-      scope,
-      severity: "error",
-    }),
-  );
+  logger.error("rate_limit_store_unavailable", { scope });
 }

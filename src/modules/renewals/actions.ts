@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { logger } from "@/lib/logger";
 import { canRenewPlans } from "@/lib/permissions/guards";
 import { getSafeInternalPath } from "@/lib/safe-redirect";
 import { requireStaffContext } from "@/modules/auth/queries";
@@ -12,7 +13,9 @@ async function notifySafely(task: () => Promise<void>) {
   try {
     await task();
   } catch (error) {
-    console.error("Notification delivery failed", error);
+    logger.error("notification_delivery_failed", {
+      errorType: error instanceof Error ? error.name : "unknown",
+    });
   }
 }
 
