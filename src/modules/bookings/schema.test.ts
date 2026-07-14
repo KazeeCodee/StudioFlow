@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { bookingAvailabilityQuerySchema } from "@/modules/bookings/schema";
+import {
+  bookingAvailabilityQuerySchema,
+  cancellationSchema,
+} from "@/modules/bookings/schema";
 
 describe("bookingAvailabilityQuerySchema", () => {
   it("acepta fecha de estudio y duracion entera", () => {
@@ -14,5 +17,14 @@ describe("bookingAvailabilityQuerySchema", () => {
     { date: "2026-04-06", durationHours: "0" },
   ])("rechaza consultas invalidas", (input) => {
     expect(bookingAvailabilityQuerySchema.safeParse(input).success).toBe(false);
+  });
+
+  it("descarta redirects externos de cancelacion", () => {
+    const result = cancellationSchema.parse({
+      bookingId: "00000000-0000-4000-8000-000000000401",
+      redirectTo: "https://evil.example/phishing",
+    });
+
+    expect(result.redirectTo).toBeUndefined();
   });
 });

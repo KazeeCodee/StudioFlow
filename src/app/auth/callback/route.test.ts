@@ -49,4 +49,15 @@ describe("GET /auth/callback", () => {
       "https://studioflow.test/reset-password?error=auth_callback_failed",
     );
   });
+
+  it("rechaza un next con barra invertida", async () => {
+    const { GET } = await import("@/app/auth/callback/route");
+    const request = new NextRequest(
+      "https://studioflow.test/auth/callback?code=pkce-code&next=/\\evil.example",
+    );
+
+    const response = await GET(request);
+
+    expect(response.headers.get("location")).toBe("https://studioflow.test/login");
+  });
 });

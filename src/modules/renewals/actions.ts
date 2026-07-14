@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canRenewPlans } from "@/lib/permissions/guards";
+import { getSafeInternalPath } from "@/lib/safe-redirect";
 import { requireStaffContext } from "@/modules/auth/queries";
 import { sendRenewalConfirmationNotification } from "@/services/notifications/dispatcher";
 import { renewMemberPlan } from "@/services/renewals/renew-member-plan";
@@ -24,7 +25,10 @@ export async function renewMemberPlanAction(formData: FormData) {
 
   const memberPlanId = String(formData.get("memberPlanId") ?? "");
   const notes = String(formData.get("notes") ?? "").trim() || undefined;
-  const redirectTo = String(formData.get("redirectTo") ?? "").trim() || "/admin/renewals";
+  const redirectTo = getSafeInternalPath(
+    String(formData.get("redirectTo") ?? "").trim(),
+    "/admin/renewals",
+  );
 
   if (!memberPlanId) {
     throw new Error("Falta el plan a renovar.");

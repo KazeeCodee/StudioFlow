@@ -1,4 +1,11 @@
 import { z } from "zod";
+import { getSafeInternalPath } from "@/lib/safe-redirect";
+
+const memberRedirectSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => getSafeInternalPath(value, "/member/profile"));
 
 export const memberProfileSchema = z.object({
   fullName: z.string().trim().min(3, "Ingresá un nombre válido."),
@@ -8,14 +15,14 @@ export const memberProfileSchema = z.object({
     .max(30, "El teléfono es demasiado largo.")
     .optional()
     .transform((value) => (value && value.length > 0 ? value : null)),
-  redirectTo: z.string().trim().optional(),
+  redirectTo: memberRedirectSchema,
 });
 
 export const memberPasswordSchema = z
   .object({
     password: z.string().trim().min(8, "La contraseña debe tener al menos 8 caracteres."),
     confirmPassword: z.string().trim().min(8, "Confirmá tu contraseña."),
-    redirectTo: z.string().trim().optional(),
+    redirectTo: memberRedirectSchema,
   })
   .refine((value) => value.password === value.confirmPassword, {
     message: "Las contraseñas no coinciden.",

@@ -1,4 +1,14 @@
 import { z } from "zod";
+import { getSafeInternalPath } from "@/lib/safe-redirect";
+
+const optionalBookingRedirectSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => {
+    const safePath = getSafeInternalPath(value, "");
+    return safePath || undefined;
+  });
 
 export const bookingAvailabilityQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -20,7 +30,7 @@ export const bookingSchema = z
 export const cancellationSchema = z.object({
   bookingId: z.string().uuid(),
   reason: z.string().trim().optional(),
-  redirectTo: z.string().optional(),
+  redirectTo: optionalBookingRedirectSchema,
 });
 
 export const rescheduleSchema = z
@@ -29,7 +39,7 @@ export const rescheduleSchema = z
     startsAt: z.string().min(1, "La nueva fecha y hora de inicio es obligatoria."),
     endsAt: z.string().min(1, "La nueva fecha y hora de fin es obligatoria."),
     reason: z.string().trim().optional(),
-    redirectTo: z.string().optional(),
+    redirectTo: optionalBookingRedirectSchema,
   })
   .refine((input) => input.startsAt < input.endsAt, {
     path: ["endsAt"],

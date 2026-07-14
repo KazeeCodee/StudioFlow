@@ -1,11 +1,11 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { auditLogs } from "@/lib/db/schema";
 import { getEnv } from "@/lib/env";
 import { getDefaultRouteForRole } from "@/lib/permissions/guards";
+import { getSafeInternalPath } from "@/lib/safe-redirect";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getProfileByUserId } from "@/modules/auth/queries";
 import {
@@ -32,36 +32,16 @@ function buildLoginStatusRedirect(status: string) {
   return `/login?${searchParams.toString()}`;
 }
 
-async function getAppOrigin() {
+function getAppOrigin() {
   const env = getEnv();
-
-  if (env.APP_URL) {
-    return env.APP_URL;
-  }
-
-  const headerStore = await headers();
-  const origin = headerStore.get("origin");
-
-  if (origin) {
-    return origin;
-  }
-
-  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
-  const protocol =
-    headerStore.get("x-forwarded-proto") ??
-    (host?.includes("localhost") ? "http" : "https");
-
-  if (host) {
-    return `${protocol}://${host}`;
-  }
-
-  return "http://localhost:3000";
+  return env.APP_URL ?? "http://localhost:3000";
 }
 
 export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const nextPath = String(formData.get("next") ?? "").trim() || null;
+  const nextPath =
+    getSafeInternalPath(String(formData.get("next") ?? "").trim(), "") || null;
 
   if (!email || !password) {
     redirect(buildLoginErrorRedirect(nextPath, "missing_credentials"));
@@ -101,7 +81,7 @@ export async function forgotPasswordAction(formData: FormData) {
     email: formData.get("email"),
   });
 
-  const origin = await getAppOrigin();
+  const origin = getAppOrigin();
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.resetPasswordForEmail(input.email, {
     redirectTo: new URL("/auth/callback?next=/reset-password", origin).toString(),
