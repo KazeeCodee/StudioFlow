@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const readinessTimeoutMs = 1_500;
+const readinessTimeoutMs = 4_000;
 
 async function withTimeout<T>(operation: Promise<T>, timeoutMs: number) {
   let timeout: ReturnType<typeof setTimeout> | undefined;

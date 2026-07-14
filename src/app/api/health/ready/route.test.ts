@@ -41,13 +41,31 @@ describe("GET /api/health/ready", () => {
     expect(serialized).not.toContain("secret");
   });
 
+  it("tolera una conexion fria de dos segundos", async () => {
+    vi.useFakeTimers();
+    execute.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve([{ ready: 1 }]), 2_000);
+        }),
+    );
+    const { GET } = await import("@/app/api/health/ready/route");
+
+    const responsePromise = GET();
+    await vi.advanceTimersByTimeAsync(2_000);
+    const response = await responsePromise;
+
+    expect(response.status).toBe(200);
+    vi.useRealTimers();
+  });
+
   it("acota el tiempo de espera de la consulta", async () => {
     vi.useFakeTimers();
     execute.mockReturnValueOnce(new Promise(() => undefined));
     const { GET } = await import("@/app/api/health/ready/route");
 
     const responsePromise = GET();
-    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.advanceTimersByTimeAsync(5_000);
     const response = await responsePromise;
 
     expect(response.status).toBe(503);
