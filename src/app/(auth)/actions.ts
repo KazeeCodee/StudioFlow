@@ -1,10 +1,21 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { auditLogs } from "@/lib/db/schema";
 import { getEnv } from "@/lib/env";
 import { getDefaultRouteForRole } from "@/lib/permissions/guards";
+import {
+  consumeRateLimit,
+  logRateLimitUnavailable,
+  redisRateLimitStore,
+} from "@/lib/rate-limit";
+import {
+  buildRateLimitKey,
+  getTrustedClientIp,
+  normalizeAccountIdentifier,
+} from "@/lib/request-identity";
 import { getSafeInternalPath } from "@/lib/safe-redirect";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getProfileByUserId } from "@/modules/auth/queries";
@@ -37,11 +48,58 @@ function getAppOrigin() {
   return env.APP_URL ?? "http://localhost:3000";
 }
 
+async function consumeAnonymousAuthRateLimit({
+  email,
+  limit,
+  scope,
+  windowMs,
+}: {
+  email: string;
+  limit: number;
+  scope: "auth:login" | "auth:password-recovery";
+  windowMs: number;
+}) {
+  const requestHeaders = await headers();
+  const key = buildRateLimitKey(scope, [
+    getTrustedClientIp(requestHeaders),
+    normalizeAccountIdentifier(email),
+  ]);
+
+  return consumeRateLimit({
+    failureMode: "closed",
+    key,
+    limit,
+    onUnavailable: () => logRateLimitUnavailable(scope),
+    store: redisRateLimitStore,
+    windowMs,
+  });
+}
+
 export async function loginAction(formData: FormData) {
-  const email = String(formData.get("email") ?? "").trim();
+  const email = normalizeAccountIdentifier(
+    String(formData.get("email") ?? ""),
+  );
   const password = String(formData.get("password") ?? "");
   const nextPath =
     getSafeInternalPath(String(formData.get("next") ?? "").trim(), "") || null;
+
+  const rateLimit = await consumeAnonymousAuthRateLimit({
+    email,
+    limit: 5,
+    scope: "auth:login",
+    windowMs: 15 * 60 * 1_000,
+  });
+
+  if (!rateLimit.allowed) {
+    redirect(
+      buildLoginErrorRedirect(
+        nextPath,
+        rateLimit.reason === "unavailable"
+          ? "temporarily_unavailable"
+          : "rate_limited",
+      ),
+    );
+  }
 
   if (!email || !password) {
     redirect(buildLoginErrorRedirect(nextPath, "missing_credentials"));
@@ -80,10 +138,27 @@ export async function forgotPasswordAction(formData: FormData) {
   const input = passwordRecoverySchema.parse({
     email: formData.get("email"),
   });
+  const email = normalizeAccountIdentifier(input.email);
+  const rateLimit = await consumeAnonymousAuthRateLimit({
+    email,
+    limit: 3,
+    scope: "auth:password-recovery",
+    windowMs: 60 * 60 * 1_000,
+  });
+
+  if (!rateLimit.allowed) {
+    redirect(
+      `/forgot-password?error=${
+        rateLimit.reason === "unavailable"
+          ? "temporarily_unavailable"
+          : "rate_limited"
+      }`,
+    );
+  }
 
   const origin = getAppOrigin();
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(input.email, {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: new URL("/auth/callback?next=/reset-password", origin).toString(),
   });
 
@@ -93,7 +168,7 @@ export async function forgotPasswordAction(formData: FormData) {
 
   const searchParams = new URLSearchParams();
   searchParams.set("status", "sent");
-  searchParams.set("email", input.email);
+  searchParams.set("email", email);
   redirect(`/forgot-password?${searchParams.toString()}`);
 }
 

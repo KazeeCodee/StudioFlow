@@ -25,6 +25,14 @@ const errorMessages: Record<string, { title: string; description: string }> = {
     title: "No pudimos enviar el correo",
     description: "Probá de nuevo en unos minutos.",
   },
+  rate_limited: {
+    title: "Demasiadas solicitudes",
+    description: "Esperá antes de pedir otro enlace.",
+  },
+  temporarily_unavailable: {
+    title: "Recuperación temporalmente no disponible",
+    description: "Probá nuevamente en unos minutos.",
+  },
 };
 
 type ForgotPasswordPageProps = {

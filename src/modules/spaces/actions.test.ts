@@ -4,6 +4,7 @@ const revalidatePath = vi.fn();
 const redirect = vi.fn();
 const requireStaffContext = vi.fn();
 const resolveSpaceImageUrl = vi.fn();
+const consumeRateLimit = vi.fn();
 const buildSpaceWriteValues = vi.fn((input: Record<string, unknown>) => ({
   name: input.name,
   slug: input.slug,
@@ -29,6 +30,14 @@ const getDb = vi.fn(() => ({ transaction }));
 vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("next/navigation", () => ({ redirect }));
 vi.mock("@/lib/db", () => ({ getDb }));
+vi.mock("@/lib/rate-limit", () => ({
+  consumeRateLimit,
+  logRateLimitUnavailable: vi.fn(),
+  redisRateLimitStore: {},
+}));
+vi.mock("@/lib/request-identity", () => ({
+  buildRateLimitKey: () => "rate-limit:upload:test-hash",
+}));
 vi.mock("@/modules/auth/queries", () => ({ requireStaffContext }));
 vi.mock("@/services/spaces/resolve-space-image", () => ({ resolveSpaceImageUrl }));
 vi.mock("@/services/spaces/build-space-write-values", () => ({ buildSpaceWriteValues }));
@@ -60,6 +69,12 @@ describe("space actions", () => {
       profile: { id: "profile-1", role: "admin" },
     });
     resolveSpaceImageUrl.mockResolvedValue(null);
+    consumeRateLimit.mockResolvedValue({
+      allowed: true,
+      reason: "allowed",
+      remaining: 19,
+      retryAfterSeconds: 900,
+    });
   });
 
   it("crea el espacio, sus rangos y la auditoria en una sola transaccion", async () => {
@@ -107,5 +122,25 @@ describe("space actions", () => {
 
     await expect(createSpaceAction(createSpaceForm("{"))).rejects.toThrow(/disponibilidad/i);
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it("corta uploads cuando se excede el limite autenticado", async () => {
+    consumeRateLimit.mockResolvedValue({
+      allowed: false,
+      reason: "exceeded",
+      remaining: 0,
+      retryAfterSeconds: 900,
+    });
+    const { createSpaceAction } = await import("@/modules/spaces/actions");
+    const formData = createSpaceForm();
+    formData.set(
+      "imageFile",
+      new File(["image"], "space.png", { type: "image/png" }),
+    );
+
+    await expect(createSpaceAction(formData)).rejects.toThrow(
+      "Demasiadas imagenes subidas. Intenta nuevamente mas tarde.",
+    );
+    expect(resolveSpaceImageUrl).not.toHaveBeenCalled();
   });
 });
