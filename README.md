@@ -83,6 +83,11 @@ Notas:
 
 Si usás Supabase CLI o un pipeline propio, podés ejecutar esas migraciones con tu flujo habitual. Si no, podés correrlas desde el SQL Editor de Supabase.
 
+Runbooks operativos antes de tocar staging o producción:
+
+- [Supabase: preparación de producción](docs/runbooks/supabase-production.md)
+- [Backup, restore y rotación](docs/runbooks/backup-restore.md)
+
 ## Bootstrap del primer admin
 
 La app ya permite crear usuarios internos desde `/admin/users`, pero para eso primero necesitás un usuario staff inicial.
