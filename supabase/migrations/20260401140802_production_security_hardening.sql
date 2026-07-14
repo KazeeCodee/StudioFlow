@@ -1,3 +1,4 @@
+-- Filename aligned with the version already recorded in production migration history.
 create schema if not exists private;
 
 grant usage on schema public to anon, authenticated;

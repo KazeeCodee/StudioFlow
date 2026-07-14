@@ -1,3 +1,4 @@
+-- Filename aligned with the version already recorded in production migration history.
 insert into storage.buckets (
   id,
   name,
