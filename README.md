@@ -223,12 +223,30 @@ El cron está expuesto en `GET /api/cron/notifications` y requiere:
 
 - header `Authorization: Bearer <CRON_SECRET>`
 
+## Conciliación de renovaciones
+
+El panel `/admin/renewals` funciona como una cola operativa única:
+
+- `Pendientes` incluye planes vencidos y próximos dentro de la ventana configurada.
+- `Todos los planes` permite consultar renovaciones anticipadas fuera de esa ventana.
+- `Historial` muestra eventos reales con operador, fechas, cupos y evidencia de pago.
+
+Para confirmar una renovación el administrador debe registrar importe en ARS, método,
+fecha de pago y verificación explícita. Transferencias y tarjetas también requieren una
+referencia externa. La operación bloquea el plan, valida su vencimiento esperado y guarda
+la evidencia junto con la auditoría antes de reiniciar los cupos.
+
+Si el correo de confirmación falla, la renovación permanece aplicada y la interfaz informa
+el fallo para que el equipo pueda contactar al miembro o reintentar la notificación. Una
+corrección posterior debe realizarse desde el flujo administrativo correspondiente; no se
+deben editar manualmente `member_plans` o `renewals` sin dejar un registro de auditoría.
+
 ## Flujos principales cubiertos
 
 - alta de miembro desde admin
 - reserva de espacio desde portal miembro
 - cancelación con reintegro según política
-- renovación manual desde admin
+- conciliación de pago y renovación manual desde una cola administrativa
 - gestión de planes, espacios y usuarios internos
 
 ## Estado actual de release

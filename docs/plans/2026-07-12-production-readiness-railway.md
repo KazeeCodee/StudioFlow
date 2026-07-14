@@ -109,6 +109,12 @@ alter table public.member_plans
 
 ### Task 5: Make cancellation, rescheduling, renewal, and adjustments atomic
 
+**Actualización 2026-07-14:** el alcance de renovaciones ya bloquea `member_plans` con
+`FOR UPDATE`, compara `expectedNextPaymentDueAt`, persiste evidencia estructurada y evita
+el doble procesamiento por datos desactualizados. La cancelación, reprogramación y los
+ajustes de cupo continúan siendo tareas independientes de este punto y no se consideran
+cerrados por el trabajo del panel de renovaciones.
+
 **Files:**
 - Modify: `src/services/bookings/cancel-booking.ts`
 - Modify: `src/services/bookings/reschedule-booking.ts`

@@ -70,6 +70,13 @@ export const notificationStatusEnum = pgEnum("notification_status", [
   "skipped",
 ]);
 
+export const paymentMethodEnum = pgEnum("payment_method", [
+  "bank_transfer",
+  "cash",
+  "card",
+  "other",
+]);
+
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
     .defaultNow()
@@ -183,45 +190,59 @@ export const plans = pgTable("plans", {
   ...timestamps,
 });
 
-export const memberPlans = pgTable("member_plans", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  memberId: uuid("member_id")
-    .notNull()
-    .references(() => members.id, { onDelete: "cascade" }),
-  planId: uuid("plan_id")
-    .notNull()
-    .references(() => plans.id, { onDelete: "restrict" }),
-  status: memberPlanStatusEnum("status").notNull().default("active"),
-  startsAt: timestamp("starts_at", { withTimezone: true, mode: "date" }).notNull(),
-  endsAt: timestamp("ends_at", { withTimezone: true, mode: "date" }).notNull(),
-  nextPaymentDueAt: timestamp("next_payment_due_at", {
-    withTimezone: true,
-    mode: "date",
-  }).notNull(),
-  quotaTotal: integer("quota_total").notNull(),
-  quotaUsed: integer("quota_used").notNull().default(0),
-  quotaRemaining: integer("quota_remaining").notNull(),
-  lastRenewedAt: timestamp("last_renewed_at", {
-    withTimezone: true,
-    mode: "date",
+export const memberPlans = pgTable(
+  "member_plans",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => plans.id, { onDelete: "restrict" }),
+    status: memberPlanStatusEnum("status").notNull().default("active"),
+    startsAt: timestamp("starts_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    endsAt: timestamp("ends_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    nextPaymentDueAt: timestamp("next_payment_due_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    quotaTotal: integer("quota_total").notNull(),
+    quotaUsed: integer("quota_used").notNull().default(0),
+    quotaRemaining: integer("quota_remaining").notNull(),
+    lastRenewedAt: timestamp("last_renewed_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    renewedManually: boolean("renewed_manually").notNull().default(false),
+    createdBy: uuid("created_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    updatedBy: uuid("updated_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    ...timestamps,
+  },
+  (table) => ({
+    statusDueIdx: index("member_plans_status_due_idx").on(
+      table.status,
+      table.nextPaymentDueAt,
+    ),
+    validQuotaCheck: check(
+      "member_plans_valid_quota",
+      sql`${table.quotaTotal} >= 0
+        and ${table.quotaUsed} >= 0
+        and ${table.quotaRemaining} >= 0
+        and ${table.quotaUsed} + ${table.quotaRemaining} = ${table.quotaTotal}`,
+    ),
   }),
-  renewedManually: boolean("renewed_manually").notNull().default(false),
-  createdBy: uuid("created_by").references(() => profiles.id, {
-    onDelete: "set null",
-  }),
-  updatedBy: uuid("updated_by").references(() => profiles.id, {
-    onDelete: "set null",
-  }),
-  ...timestamps,
-}, (table) => ({
-  validQuotaCheck: check(
-    "member_plans_valid_quota",
-    sql`${table.quotaTotal} >= 0
-      and ${table.quotaUsed} >= 0
-      and ${table.quotaRemaining} >= 0
-      and ${table.quotaUsed} + ${table.quotaRemaining} = ${table.quotaTotal}`,
-  ),
-}));
+);
 
 export const bookings = pgTable("bookings", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -272,28 +293,43 @@ export const bookingStatusHistory = pgTable("booking_status_history", {
   note: text("note"),
 });
 
-export const renewals = pgTable("renewals", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  memberId: uuid("member_id")
-    .notNull()
-    .references(() => members.id, { onDelete: "cascade" }),
-  memberPlanId: uuid("member_plan_id")
-    .notNull()
-    .references(() => memberPlans.id, { onDelete: "cascade" }),
-  renewedBy: uuid("renewed_by").references(() => profiles.id, {
-    onDelete: "set null",
+export const renewals = pgTable(
+  "renewals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    memberPlanId: uuid("member_plan_id")
+      .notNull()
+      .references(() => memberPlans.id, { onDelete: "cascade" }),
+    renewedBy: uuid("renewed_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    renewedAt: timestamp("renewed_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+    oldEndDate: timestamp("old_end_date", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    newEndDate: timestamp("new_end_date", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    oldQuotaRemaining: integer("old_quota_remaining").notNull(),
+    newQuotaTotal: integer("new_quota_total").notNull(),
+    amountReceived: numeric("amount_received", { precision: 10, scale: 2 }),
+    currency: text("currency").notNull().default("ARS"),
+    paymentMethod: paymentMethodEnum("payment_method"),
+    paidAt: timestamp("paid_at", { withTimezone: true, mode: "date" }),
+    externalReference: text("external_reference"),
+    notes: text("notes"),
+  },
+  (table) => ({
+    renewedAtIdx: index("renewals_renewed_at_idx").on(table.renewedAt),
   }),
-  renewedAt: timestamp("renewed_at", { withTimezone: true, mode: "date" })
-    .defaultNow()
-    .notNull(),
-  oldEndDate: timestamp("old_end_date", { withTimezone: true, mode: "date" })
-    .notNull(),
-  newEndDate: timestamp("new_end_date", { withTimezone: true, mode: "date" })
-    .notNull(),
-  oldQuotaRemaining: integer("old_quota_remaining").notNull(),
-  newQuotaTotal: integer("new_quota_total").notNull(),
-  notes: text("notes"),
-});
+);
 
 export const systemSettings = pgTable("system_settings", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -588,8 +588,16 @@ export class StudioFlowTestKit {
     const [renewal] = await this.sql<{
       id: string;
       notes: string | null;
+      amountReceived: string | null;
+      paymentMethod: string | null;
+      externalReference: string | null;
     }[]>`
-      select id, notes
+      select
+        id,
+        notes,
+        amount_received as "amountReceived",
+        payment_method as "paymentMethod",
+        external_reference as "externalReference"
       from renewals
       where member_plan_id = ${memberPlanId}
       order by renewed_at desc

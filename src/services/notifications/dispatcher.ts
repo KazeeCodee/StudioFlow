@@ -370,32 +370,39 @@ export async function sendBookingRescheduledNotifications(bookingId: string) {
 }
 
 export async function sendRenewalConfirmationNotification(renewalId: string) {
-  const renewal = await getRenewalNotificationContext(renewalId);
+  try {
+    const renewal = await getRenewalNotificationContext(renewalId);
 
-  if (!renewal) {
-    return;
+    if (!renewal) {
+      return "failed" as const;
+    }
+
+    const appUrl = getAppUrl();
+    const email = renderRenewalTransactionalEmail({
+      memberName: renewal.memberName,
+      planName: renewal.planName,
+      nextPaymentDueAt: renewal.nextPaymentDueAt,
+      quotaRemaining: renewal.quotaRemaining,
+      appUrl,
+    });
+
+    const outcome = await attemptEmailDeliverySafely({
+      audience: "member",
+      eventType: "plan_renewed",
+      recipientEmail: renewal.memberEmail,
+      recipientName: renewal.memberName,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+      dedupeKey: `plan-renewed-member:${renewal.renewalId}`,
+      payload: { renewalId: renewal.renewalId },
+    });
+
+    return outcome.status;
+  } catch (error) {
+    console.error("Renewal notification preparation failed", error);
+    return "failed" as const;
   }
-
-  const appUrl = getAppUrl();
-  const email = renderRenewalTransactionalEmail({
-    memberName: renewal.memberName,
-    planName: renewal.planName,
-    nextPaymentDueAt: renewal.nextPaymentDueAt,
-    quotaRemaining: renewal.quotaRemaining,
-    appUrl,
-  });
-
-  await attemptEmailDelivery({
-    audience: "member",
-    eventType: "plan_renewed",
-    recipientEmail: renewal.memberEmail,
-    recipientName: renewal.memberName,
-    subject: email.subject,
-    html: email.html,
-    text: email.text,
-    dedupeKey: `plan-renewed-member:${renewal.renewalId}`,
-    payload: { renewalId: renewal.renewalId },
-  });
 }
 
 export async function sendDailyReminderNotifications(now: Date = new Date()) {
