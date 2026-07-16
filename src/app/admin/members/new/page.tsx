@@ -19,7 +19,7 @@ export default async function NewMemberPage() {
         <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Miembros</p>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight">Nuevo miembro</h2>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Creá el acceso inicial del miembro, asignale su plan y dejá configurado su ciclo inicial de cupos.
+          Creá el acceso inicial del miembro y asignale un plan ahora o más adelante desde su ficha.
         </p>
       </div>
       <MemberForm planOptions={planOptions} />
