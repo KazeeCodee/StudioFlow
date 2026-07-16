@@ -41,19 +41,21 @@ export async function createMemberWithPlan(
   const db = getDb();
   const adminClient = createSupabaseAdminClient();
 
-  const [selectedPlan] = await db
-    .select({
-      id: plans.id,
-      name: plans.name,
-      quotaAmount: plans.quotaAmount,
-      durationType: plans.durationType,
-      durationValue: plans.durationValue,
-    })
-    .from(plans)
-    .where(eq(plans.id, input.planId))
-    .limit(1);
+  const [selectedPlan] = input.planId
+    ? await db
+        .select({
+          id: plans.id,
+          name: plans.name,
+          quotaAmount: plans.quotaAmount,
+          durationType: plans.durationType,
+          durationValue: plans.durationValue,
+        })
+        .from(plans)
+        .where(eq(plans.id, input.planId))
+        .limit(1)
+    : [];
 
-  if (!selectedPlan) {
+  if (input.planId && !selectedPlan) {
     throw new Error("El plan seleccionado no existe.");
   }
 
@@ -69,16 +71,6 @@ export async function createMemberWithPlan(
   if (authResult.error || !authResult.data.user) {
     throw new Error(authResult.error?.message ?? "No se pudo crear el usuario autenticado.");
   }
-
-  const startsAt = new Date();
-  const endsAt = calculatePlanDates({
-    durationType: selectedPlan.durationType,
-    durationValue: selectedPlan.durationValue,
-    startsAt,
-  });
-  const quotaTotal = calculateInitialQuota({
-    quotaAmount: selectedPlan.quotaAmount,
-  });
 
   try {
     return await db.transaction(async (tx) => {
@@ -113,24 +105,39 @@ export async function createMemberWithPlan(
           fullName: members.fullName,
         });
 
-      const [createdMemberPlan] = await tx
-        .insert(memberPlans)
-        .values({
-          memberId: createdMember.id,
-          planId: selectedPlan.id,
-          status: "active",
+      let memberPlanId: string | null = null;
+
+      if (selectedPlan) {
+        const startsAt = new Date();
+        const endsAt = calculatePlanDates({
+          durationType: selectedPlan.durationType,
+          durationValue: selectedPlan.durationValue,
           startsAt,
-          endsAt,
-          nextPaymentDueAt: endsAt,
-          quotaTotal,
-          quotaRemaining: quotaTotal,
-          quotaUsed: 0,
-          createdBy: actor.id,
-          updatedBy: actor.id,
-        })
-        .returning({
-          id: memberPlans.id,
         });
+        const quotaTotal = calculateInitialQuota({
+          quotaAmount: selectedPlan.quotaAmount,
+        });
+        const [createdMemberPlan] = await tx
+          .insert(memberPlans)
+          .values({
+            memberId: createdMember.id,
+            planId: selectedPlan.id,
+            status: "active",
+            startsAt,
+            endsAt,
+            nextPaymentDueAt: endsAt,
+            quotaTotal,
+            quotaRemaining: quotaTotal,
+            quotaUsed: 0,
+            createdBy: actor.id,
+            updatedBy: actor.id,
+          })
+          .returning({
+            id: memberPlans.id,
+          });
+
+        memberPlanId = createdMemberPlan.id;
+      }
 
       await tx.insert(auditLogs).values({
         actorId: actor.id,
@@ -140,14 +147,14 @@ export async function createMemberWithPlan(
         entityId: createdMember.id,
         metadata: {
           memberName: createdMember.fullName,
-          planId: selectedPlan.id,
-          memberPlanId: createdMemberPlan.id,
+          planId: selectedPlan?.id ?? null,
+          memberPlanId,
         },
       });
 
       return {
         memberId: createdMember.id,
-        memberPlanId: createdMemberPlan.id,
+        memberPlanId,
       };
     });
   } catch (error) {

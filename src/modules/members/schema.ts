@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 const memberStatusSchema = z.enum(["active", "inactive", "suspended"]);
+const optionalPlanIdSchema = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.string().uuid("Seleccioná un plan válido.").optional(),
+);
 
 export const memberSchema = z.object({
   fullName: z.string().min(2, "El nombre es obligatorio."),
@@ -8,7 +12,7 @@ export const memberSchema = z.object({
   phone: z.string().trim().optional(),
   password: z.string().min(8, "La contraseña inicial debe tener al menos 8 caracteres."),
   status: memberStatusSchema.default("active"),
-  planId: z.string().uuid("Seleccioná un plan válido."),
+  planId: optionalPlanIdSchema,
   notes: z.string().trim().optional(),
 });
 
