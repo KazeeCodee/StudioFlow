@@ -5,6 +5,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { auditLogs, bookings, memberPlans, members, profiles, renewals } from "@/lib/db/schema";
+import {
+  type FormActionState,
+  toFormActionError,
+} from "@/lib/form-action-state";
 import { logger } from "@/lib/logger";
 import { canManageMembers } from "@/lib/permissions/guards";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -37,22 +41,34 @@ function assertCanManageMembers(role: AppRole) {
   }
 }
 
-export async function createMemberAction(formData: FormData) {
+export async function createMemberAction(
+  _previousState: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
   const { profile } = await requireStaffContext();
   assertCanManageMembers(profile.role);
-  const input = memberSchema.parse({
-    fullName: formData.get("fullName"),
-    email: formData.get("email"),
-    phone: formData.get("phone"),
-    password: formData.get("password"),
-    status: formData.get("status"),
-    planId: formData.get("planId"),
-    notes: formData.get("notes"),
-  });
+  let createdMemberId: string;
 
-  await createMemberWithPlan(input, profile);
+  try {
+    const input = memberSchema.parse({
+      fullName: formData.get("fullName"),
+      email: formData.get("email"),
+      phone: formData.get("phone"),
+      password: formData.get("password"),
+      status: formData.get("status"),
+      planId: formData.get("planId"),
+      notes: formData.get("notes"),
+    });
+
+    const result = await createMemberWithPlan(input, profile);
+    createdMemberId = result.memberId;
+  } catch (error) {
+    logger.error("member_creation_failed", { error, profileId: profile.id });
+    return toFormActionError(error, "No se pudo crear el miembro.");
+  }
 
   revalidateMemberPaths();
+  redirect(`/admin/members/${createdMemberId}`);
 }
 
 export async function updateMemberProfileAction(formData: FormData) {

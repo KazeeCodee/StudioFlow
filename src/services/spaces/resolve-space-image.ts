@@ -36,7 +36,7 @@ function isUploadedFile(file: UploadedImageFile): file is File {
   return Boolean(
     file &&
       typeof file.arrayBuffer === "function" &&
-      (file.size > 0 || file.name.length > 0),
+      file.size > 0,
   );
 }
 

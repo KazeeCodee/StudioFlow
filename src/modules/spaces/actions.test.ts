@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { initialFormActionState } from "@/lib/form-action-state";
 
 const revalidatePath = vi.fn();
 const redirect = vi.fn();
@@ -80,7 +81,7 @@ describe("space actions", () => {
   it("crea el espacio, sus rangos y la auditoria en una sola transaccion", async () => {
     const { createSpaceAction } = await import("@/modules/spaces/actions");
 
-    await createSpaceAction(createSpaceForm());
+    await createSpaceAction(initialFormActionState, createSpaceForm());
 
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(tx.insert).toHaveBeenCalledTimes(3);
@@ -100,6 +101,7 @@ describe("space actions", () => {
         isActive: true,
       }),
     ]);
+    expect(redirect).toHaveBeenCalledWith("/admin/spaces/space-1");
   });
 
   it("reemplaza todos los rangos durante la actualizacion", async () => {
@@ -120,7 +122,12 @@ describe("space actions", () => {
   it("rechaza disponibilidad mal serializada antes de escribir", async () => {
     const { createSpaceAction } = await import("@/modules/spaces/actions");
 
-    await expect(createSpaceAction(createSpaceForm("{"))).rejects.toThrow(/disponibilidad/i);
+    const result = await createSpaceAction(initialFormActionState, createSpaceForm("{"));
+
+    expect(result).toEqual({
+      status: "error",
+      message: expect.stringMatching(/disponibilidad/i),
+    });
     expect(transaction).not.toHaveBeenCalled();
   });
 
@@ -138,9 +145,27 @@ describe("space actions", () => {
       new File(["image"], "space.png", { type: "image/png" }),
     );
 
-    await expect(createSpaceAction(formData)).rejects.toThrow(
-      "Demasiadas imagenes subidas. Intenta nuevamente mas tarde.",
-    );
+    const result = await createSpaceAction(initialFormActionState, formData);
+
+    expect(result).toEqual({
+      status: "error",
+      message: "Demasiadas imagenes subidas. Intenta nuevamente mas tarde.",
+    });
     expect(resolveSpaceImageUrl).not.toHaveBeenCalled();
+  });
+
+  it("devuelve el error de imagen dentro del estado del formulario", async () => {
+    resolveSpaceImageUrl.mockRejectedValue(
+      new Error("La imagen debe ser JPG, PNG, GIF o WEBP."),
+    );
+    const { createSpaceAction } = await import("@/modules/spaces/actions");
+
+    const result = await createSpaceAction(initialFormActionState, createSpaceForm());
+
+    expect(result).toEqual({
+      status: "error",
+      message: "La imagen debe ser JPG, PNG, GIF o WEBP.",
+    });
+    expect(transaction).not.toHaveBeenCalled();
   });
 });

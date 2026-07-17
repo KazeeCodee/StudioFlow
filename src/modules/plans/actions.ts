@@ -5,6 +5,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { auditLogs, memberPlans, plans } from "@/lib/db/schema";
+import {
+  type FormActionState,
+  toFormActionError,
+} from "@/lib/form-action-state";
+import { logger } from "@/lib/logger";
 import { canManagePlans } from "@/lib/permissions/guards";
 import { requireStaffContext } from "@/modules/auth/queries";
 import type { AppRole } from "@/modules/auth/types";
@@ -26,39 +31,52 @@ function assertCanManagePlans(role: AppRole) {
   }
 }
 
-export async function createPlanAction(formData: FormData) {
+export async function createPlanAction(
+  _previousState: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
   const { profile } = await requireStaffContext();
   assertCanManagePlans(profile.role);
-  const input = planSchema.parse({
-    name: formData.get("name"),
-    description: formData.get("description"),
-    status: formData.get("status"),
-    durationType: formData.get("durationType"),
-    durationValue: formData.get("durationValue"),
-    quotaAmount: formData.get("quotaAmount"),
-    price: formData.get("price"),
-    cancellationPolicyHours: formData.get("cancellationPolicyHours"),
-    maxBookingsPerDay: formData.get("maxBookingsPerDay"),
-    maxBookingsPerWeek: formData.get("maxBookingsPerWeek"),
-  });
-  const values = buildPlanWriteValues(input);
+  let createdPlanId: string;
 
-  const db = getDb();
-  const [createdPlan] = await db
-    .insert(plans)
-    .values(values)
-    .returning({ id: plans.id, name: plans.name });
+  try {
+    const input = planSchema.parse({
+      name: formData.get("name"),
+      description: formData.get("description"),
+      status: formData.get("status"),
+      durationType: formData.get("durationType"),
+      durationValue: formData.get("durationValue"),
+      quotaAmount: formData.get("quotaAmount"),
+      price: formData.get("price"),
+      cancellationPolicyHours: formData.get("cancellationPolicyHours"),
+      maxBookingsPerDay: formData.get("maxBookingsPerDay"),
+      maxBookingsPerWeek: formData.get("maxBookingsPerWeek"),
+    });
+    const values = buildPlanWriteValues(input);
 
-  await db.insert(auditLogs).values({
-    actorId: profile.id,
-    actorRole: profile.role,
-    action: "plan.created",
-    entityType: "plan",
-    entityId: createdPlan.id,
-    metadata: { name: createdPlan.name },
-  });
+    const db = getDb();
+    const [createdPlan] = await db
+      .insert(plans)
+      .values(values)
+      .returning({ id: plans.id, name: plans.name });
+
+    await db.insert(auditLogs).values({
+      actorId: profile.id,
+      actorRole: profile.role,
+      action: "plan.created",
+      entityType: "plan",
+      entityId: createdPlan.id,
+      metadata: { name: createdPlan.name },
+    });
+
+    createdPlanId = createdPlan.id;
+  } catch (error) {
+    logger.error("plan_creation_failed", { error, profileId: profile.id });
+    return toFormActionError(error, "No se pudo crear el plan.");
+  }
 
   revalidatePlanPaths();
+  redirect(`/admin/plans/${createdPlanId}`);
 }
 
 export async function updatePlanAction(formData: FormData) {

@@ -1,3 +1,6 @@
+"use client";
+
+import { useActionState } from "react";
 import { createMemberAction } from "@/modules/members/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { listActivePlanOptions } from "@/modules/plans/queries";
+import { initialFormActionState } from "@/lib/form-action-state";
 
 type PlanOption = Awaited<ReturnType<typeof listActivePlanOptions>>[number];
 
@@ -13,13 +17,18 @@ type MemberFormProps = {
 };
 
 export function MemberForm({ planOptions }: MemberFormProps) {
+  const [state, formAction, pending] = useActionState(
+    createMemberAction,
+    initialFormActionState,
+  );
+
   return (
     <Card className="rounded-[28px] border-border/70">
       <CardHeader>
         <CardTitle>Crear miembro</CardTitle>
       </CardHeader>
       <CardContent>
-        <form action={createMemberAction} className="grid gap-5 md:grid-cols-2">
+        <form action={formAction} className="grid gap-5 md:grid-cols-2">
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="fullName">Nombre y apellido</Label>
             <Input id="fullName" name="fullName" placeholder="Ana Pérez" required />
@@ -79,8 +88,20 @@ export function MemberForm({ planOptions }: MemberFormProps) {
             <Textarea id="notes" name="notes" placeholder="Observaciones del staff..." />
           </div>
 
+          {state.status === "error" ? (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive md:col-span-2"
+            >
+              {state.message}
+            </div>
+          ) : null}
+
           <div className="md:col-span-2">
-            <Button type="submit">Crear miembro</Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Guardando..." : "Crear miembro"}
+            </Button>
           </div>
         </form>
       </CardContent>

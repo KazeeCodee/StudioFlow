@@ -6,6 +6,11 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { parseStudioDateTimeInput } from "@/lib/datetime";
 import { auditLogs, bookings, spaceAvailabilityRules, spaceBlocks, spaces } from "@/lib/db/schema";
+import {
+  type FormActionState,
+  toFormActionError,
+} from "@/lib/form-action-state";
+import { logger } from "@/lib/logger";
 import { canManageSpaces } from "@/lib/permissions/guards";
 import {
   consumeRateLimit,
@@ -45,7 +50,7 @@ function assertCanManageSpaces(role: AppRole) {
 }
 
 async function assertSpaceUploadRateLimit(profileId: string, file: FormDataEntryValue | null) {
-  if (!(file instanceof File) || (file.size === 0 && file.name.length === 0)) {
+  if (!(file instanceof File) || file.size === 0) {
     return;
   }
 
@@ -65,71 +70,84 @@ async function assertSpaceUploadRateLimit(profileId: string, file: FormDataEntry
   }
 }
 
-export async function createSpaceAction(formData: FormData) {
+export async function createSpaceAction(
+  _previousState: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
   const { profile } = await requireStaffContext();
   assertCanManageSpaces(profile.role);
-  const imageFile = formData.get("imageFile");
-  await assertSpaceUploadRateLimit(profile.id, imageFile);
-  const name = String(formData.get("name") ?? "");
-  const slug = slugify(name);
-  const imageUrl = await resolveSpaceImageUrl({
-    file: imageFile as File | null,
-    removeImage: false,
-    slug,
-  });
-  const availabilityRules = parseAvailabilityRulesField(formData.get("availabilityRules")).filter(
-    (rule) => rule.isActive,
-  );
-  const input = spaceSchema.parse({
-    name,
-    slug,
-    description: formData.get("description"),
-    imageUrl: imageUrl ?? "",
-    galleryUrls: readStringArray(formData, "galleryUrls"),
-    videoLinks: readStringArray(formData, "videoLinks"),
-    capacity: formData.get("capacity"),
-    status: formData.get("status"),
-    hourlyQuotaCost: formData.get("hourlyQuotaCost"),
-    minBookingHours: formData.get("minBookingHours"),
-    maxBookingHours: formData.get("maxBookingHours"),
-    availabilityRules,
-  });
+  let createdSpaceId: string;
 
-  const db = getDb();
-  const values = buildSpaceWriteValues(input);
-
-  await db.transaction(async (tx) => {
-    const [space] = await tx
-      .insert(spaces)
-      .values(values)
-      .returning({ id: spaces.id, name: spaces.name, slug: spaces.slug });
-
-    if (input.availabilityRules.length > 0) {
-      await tx.insert(spaceAvailabilityRules).values(
-        input.availabilityRules.map((rule) => ({
-          spaceId: space.id,
-          dayOfWeek: rule.dayOfWeek,
-          startTime: rule.startTime,
-          endTime: rule.endTime,
-          isActive: true,
-        })),
-      );
-    }
-
-    await tx.insert(auditLogs).values({
-      actorId: profile.id,
-      actorRole: profile.role,
-      action: "space.created",
-      entityType: "space",
-      entityId: space.id,
-      metadata: {
-        name: space.name,
-        slug: space.slug,
-      },
+  try {
+    const imageFile = formData.get("imageFile");
+    await assertSpaceUploadRateLimit(profile.id, imageFile);
+    const name = String(formData.get("name") ?? "");
+    const slug = slugify(name);
+    const imageUrl = await resolveSpaceImageUrl({
+      file: imageFile as File | null,
+      removeImage: false,
+      slug,
     });
-  });
+    const availabilityRules = parseAvailabilityRulesField(formData.get("availabilityRules")).filter(
+      (rule) => rule.isActive,
+    );
+    const input = spaceSchema.parse({
+      name,
+      slug,
+      description: formData.get("description"),
+      imageUrl: imageUrl ?? "",
+      galleryUrls: readStringArray(formData, "galleryUrls"),
+      videoLinks: readStringArray(formData, "videoLinks"),
+      capacity: formData.get("capacity"),
+      status: formData.get("status"),
+      hourlyQuotaCost: formData.get("hourlyQuotaCost"),
+      minBookingHours: formData.get("minBookingHours"),
+      maxBookingHours: formData.get("maxBookingHours"),
+      availabilityRules,
+    });
+
+    const db = getDb();
+    const values = buildSpaceWriteValues(input);
+
+    createdSpaceId = await db.transaction(async (tx) => {
+      const [space] = await tx
+        .insert(spaces)
+        .values(values)
+        .returning({ id: spaces.id, name: spaces.name, slug: spaces.slug });
+
+      if (input.availabilityRules.length > 0) {
+        await tx.insert(spaceAvailabilityRules).values(
+          input.availabilityRules.map((rule) => ({
+            spaceId: space.id,
+            dayOfWeek: rule.dayOfWeek,
+            startTime: rule.startTime,
+            endTime: rule.endTime,
+            isActive: true,
+          })),
+        );
+      }
+
+      await tx.insert(auditLogs).values({
+        actorId: profile.id,
+        actorRole: profile.role,
+        action: "space.created",
+        entityType: "space",
+        entityId: space.id,
+        metadata: {
+          name: space.name,
+          slug: space.slug,
+        },
+      });
+
+      return space.id;
+    });
+  } catch (error) {
+    logger.error("space_creation_failed", { error, profileId: profile.id });
+    return toFormActionError(error, "No se pudo crear el espacio.");
+  }
 
   revalidateSpacePaths();
+  redirect(`/admin/spaces/${createdSpaceId}`);
 }
 
 export async function updateSpaceAction(formData: FormData) {

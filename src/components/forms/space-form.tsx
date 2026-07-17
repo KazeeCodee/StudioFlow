@@ -1,3 +1,6 @@
+"use client";
+
+import { useActionState } from "react";
 import { createSpaceAction } from "@/modules/spaces/actions";
 import { SpaceMediaManager } from "@/components/spaces/space-media-manager";
 import { WeeklyAvailabilityEditor } from "@/components/forms/weekly-availability-editor";
@@ -6,6 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  type FormActionState,
+  initialFormActionState,
+} from "@/lib/form-action-state";
 
 type AvailabilityRuleValue = {
   dayOfWeek: number;
@@ -37,19 +44,33 @@ type SpaceFormProps = {
 };
 
 export function SpaceForm({
-  action = createSpaceAction,
+  action,
   title = "Crear espacio",
   submitLabel = "Guardar espacio",
   defaultValues,
   children,
 }: SpaceFormProps) {
+  const statefulAction = action
+    ? async (
+        _previousState: FormActionState,
+        formData: FormData,
+      ): Promise<FormActionState> => {
+        await action(formData);
+        return initialFormActionState;
+      }
+    : createSpaceAction;
+  const [state, formAction, pending] = useActionState(
+    statefulAction,
+    initialFormActionState,
+  );
+
   return (
     <Card className="rounded-2xl border-border/60">
       <CardHeader className="border-b border-border/60 pb-4">
         <CardTitle className="text-base font-semibold">{title}</CardTitle>
       </CardHeader>
       <CardContent className="pt-6">
-        <form action={action} className="space-y-10">
+        <form action={formAction} className="space-y-10">
           {children}
 
           {/* ── Información básica ─────────────────────────────────────────── */}
@@ -181,8 +202,18 @@ export function SpaceForm({
             <WeeklyAvailabilityEditor initialRules={defaultValues?.availabilityRules} />
           </section>
 
-          <Button type="submit" className="w-full sm:w-auto">
-            {submitLabel}
+          {state.status === "error" ? (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            >
+              {state.message}
+            </div>
+          ) : null}
+
+          <Button type="submit" className="w-full sm:w-auto" disabled={pending}>
+            {pending ? "Guardando..." : submitLabel}
           </Button>
         </form>
       </CardContent>

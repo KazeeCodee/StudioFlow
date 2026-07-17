@@ -1,9 +1,16 @@
+"use client";
+
+import { useActionState } from "react";
 import { createPlanAction } from "@/modules/plans/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  type FormActionState,
+  initialFormActionState,
+} from "@/lib/form-action-state";
 
 type PlanFormValues = {
   name?: string;
@@ -28,20 +35,34 @@ type PlanFormProps = {
 };
 
 export function PlanForm({
-  action = createPlanAction,
+  action,
   title = "Crear plan",
   submitLabel = "Guardar plan",
   defaultValues,
   showStatusField = true,
   children,
 }: PlanFormProps) {
+  const statefulAction = action
+    ? async (
+        _previousState: FormActionState,
+        formData: FormData,
+      ): Promise<FormActionState> => {
+        await action(formData);
+        return initialFormActionState;
+      }
+    : createPlanAction;
+  const [state, formAction, pending] = useActionState(
+    statefulAction,
+    initialFormActionState,
+  );
+
   return (
     <Card className="rounded-[28px] border-border/70">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <form action={action} className="grid gap-5 md:grid-cols-2">
+        <form action={formAction} className="grid gap-5 md:grid-cols-2">
           {children}
 
           <div className="space-y-2 md:col-span-2">
@@ -169,8 +190,20 @@ export function PlanForm({
             />
           </div>
 
+          {state.status === "error" ? (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive md:col-span-2"
+            >
+              {state.message}
+            </div>
+          ) : null}
+
           <div className="md:col-span-2">
-            <Button type="submit">{submitLabel}</Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Guardando..." : submitLabel}
+            </Button>
           </div>
         </form>
       </CardContent>

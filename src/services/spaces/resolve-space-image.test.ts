@@ -110,14 +110,24 @@ describe("resolveSpaceImageUrl", () => {
     expect(upload).not.toHaveBeenCalled();
   });
 
+  it("trata un archivo placeholder vacio como ausencia de imagen", async () => {
+    const result = await resolveSpaceImageUrl({
+      adminClient: storageClient as never,
+      file: new File([], "placeholder", { type: "application/octet-stream" }),
+      projectUrl: "https://rmkngkkuglexnzzuvdgb.supabase.co",
+      removeImage: false,
+      slug: "sala-podcast",
+    });
+
+    expect(result).toBeNull();
+    expect(upload).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+  });
+
   it.each([
     {
       file: new File(["<svg></svg>"], "plano.svg", { type: "image/svg+xml" }),
       message: "La imagen debe ser JPG, PNG, GIF o WEBP.",
-    },
-    {
-      file: new File([], "vacia.png", { type: "image/png" }),
-      message: "La imagen no puede estar vacia.",
     },
     {
       file: new File(["fake"], "foto.jpg", { type: "image/png" }),
